@@ -3,10 +3,10 @@
 A working tree for setlist-to-playlist with an evolving implementation history.
 
 ## Overview
-setlist-to-playlist tracks the practical state of the current maintenance pass.
+setlist-to-playlist keeps the active steady build work visible.
 
 ## Status
-Lifecycle stage: bootstrap.
+Project phase: bootstrap.
 
 ## Usage
-- Made the the main flow assumptions easier to check later.
+- Merged scattered api guidance into the docs.

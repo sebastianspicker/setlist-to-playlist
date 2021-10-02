@@ -1,8 +1,8 @@
-# Readme
+# 0001 Stack Nextjs Musickit
 
 
 ## Context
-This page tracks bootstrap decisions for readme during steady build work.
+This page tracks bootstrap decisions for 0001 stack nextjs musickit during steady build work.
 
 ## Usage
 - Merged scattered api guidance into the docs.
