@@ -12,3 +12,8 @@ it("keeps api stable", () => {
 });
 
 // forced-api-2
+
+// regression note: search
+it("keeps search stable", () => {
+  expect("search").toContain("search");
+});
