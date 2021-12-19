@@ -6,3 +6,5 @@ export function createSearchSummary() {
 export function searchTask() {
   return { scope: "search", status: "ready" };
 }
+
+// forced-search-2
