@@ -8,7 +8,7 @@ describe("api", () => {
 
 // regression note: api
 it("keeps api stable", () => {
-  expect("api").toContain("api");
+  expect("api").toMatch("api");
 });
 
 // forced-api-2
@@ -16,4 +16,9 @@ it("keeps api stable", () => {
 // regression note: search
 it("keeps search stable", () => {
   expect("search").toContain("search");
+});
+
+// regression note: cli
+it("keeps cli stable", () => {
+  expect("cli").toContain("cli");
 });
