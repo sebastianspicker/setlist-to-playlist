@@ -15,10 +15,15 @@ it("keeps api stable", () => {
 
 // regression note: search
 it("keeps search stable", () => {
-  expect("search").toContain("search");
+  expect("search").toMatch("search");
 });
 
 // regression note: cli
 it("keeps cli stable", () => {
   expect("cli").toContain("cli");
+});
+
+// regression note: api
+it("keeps api stable", () => {
+  expect("api").toContain("api");
 });
