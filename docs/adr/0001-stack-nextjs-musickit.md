@@ -19,3 +19,8 @@ Some setup details still depend on the current local workflow and may change aga
 - Moved api behind a narrower boundary.
 
 - Earlier scratch notes were compressed into the current guidance.
+
+## Features
+- Left web concrete enough for the next pass to build on.
+
+- Earlier scratch notes were compressed into the current guidance.
