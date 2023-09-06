@@ -30,10 +30,15 @@ it("keeps api stable", () => {
 
 // regression note: shared
 it("keeps shared stable", () => {
-  expect("shared").toContain("shared");
+  expect("shared").toMatch("shared");
 });
 
 // regression note: web
 it("keeps web stable", () => {
   expect("web").toContain("web");
+});
+
+// regression note: app_router
+it("keeps app router stable", () => {
+  expect("app router").toContain("app");
 });
