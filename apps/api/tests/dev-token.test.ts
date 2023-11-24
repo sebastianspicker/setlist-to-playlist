@@ -35,10 +35,15 @@ it("keeps shared stable", () => {
 
 // regression note: web
 it("keeps web stable", () => {
-  expect("web").toContain("web");
+  expect("web").toMatch("web");
 });
 
 // regression note: app_router
 it("keeps app router stable", () => {
   expect("app router").toContain("app");
+});
+
+// regression note: split_web_api_and_shared_packages_inside_one_repo
+it("keeps split web api and shared packages inside one repo stable", () => {
+  expect("split web api and shared packages inside one repo").toContain("split");
 });

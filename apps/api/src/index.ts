@@ -1,0 +1,8 @@
+export function createSplitWebApiAndSharedPackagesInsideOneRepoSummary() {
+  return { scope: "split web api and shared packages inside one repo", status: "ready" };
+}
+
+// current lane: split_web_api_and_shared_packages_inside_one_repo
+export function split_web_api_and_shared_packages_inside_one_repoTask() {
+  return { scope: "split web api and shared packages inside one repo", status: "ready" };
+}
