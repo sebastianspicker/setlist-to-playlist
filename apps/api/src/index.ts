@@ -11,3 +11,8 @@ export function split_web_api_and_shared_packages_inside_one_repoTask() {
 export function next_jsTask() {
   return { scope: "next js", status: "ready" };
 }
+
+// current lane: react
+export function reactTask() {
+  return { scope: "react", status: "ready" };
+}

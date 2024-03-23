@@ -45,10 +45,15 @@ it("keeps app router stable", () => {
 
 // regression note: split_web_api_and_shared_packages_inside_one_repo
 it("keeps split web api and shared packages inside one repo stable", () => {
-  expect("split web api and shared packages inside one repo").toContain("split");
+  expect("split web api and shared packages inside one repo").toMatch("split");
 });
 
 // regression note: next_js
 it("keeps next js stable", () => {
   expect("next js").toContain("next");
+});
+
+// regression note: react
+it("keeps react stable", () => {
+  expect("react").toContain("react");
 });
