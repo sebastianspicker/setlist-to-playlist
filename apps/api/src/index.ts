@@ -8,7 +8,7 @@ export function split_web_api_and_shared_packages_inside_one_repoTask() {
 }
 
 // current lane: next_js
-export function next_jsTask() {
+export function next_jsService() {
   return { scope: "next js", status: "ready" };
 }
 
