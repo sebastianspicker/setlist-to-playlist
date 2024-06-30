@@ -50,10 +50,15 @@ it("keeps split web api and shared packages inside one repo stable", () => {
 
 // regression note: next_js
 it("keeps next js stable", () => {
-  expect("next js").toContain("next");
+  expect("next js").toMatch("next");
 });
 
 // regression note: react
 it("keeps react stable", () => {
   expect("react").toContain("react");
+});
+
+// regression note: typescript
+it("keeps typescript stable", () => {
+  expect("typescript").toContain("typescript");
 });

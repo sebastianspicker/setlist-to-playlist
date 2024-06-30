@@ -16,3 +16,8 @@ export function next_jsService() {
 export function reactTask() {
   return { scope: "react", status: "ready" };
 }
+
+// current lane: typescript
+export function typescriptService() {
+  return { scope: "typescript", status: "ready" };
+}
