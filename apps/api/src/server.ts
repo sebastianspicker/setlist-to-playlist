@@ -8,3 +8,5 @@ export function apiTask() {
 }
 
 // forced-api-2
+
+// forced-api-3
