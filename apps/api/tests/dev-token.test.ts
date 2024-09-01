@@ -55,10 +55,15 @@ it("keeps next js stable", () => {
 
 // regression note: react
 it("keeps react stable", () => {
-  expect("react").toContain("react");
+  expect("react").toMatch("react");
 });
 
 // regression note: typescript
 it("keeps typescript stable", () => {
   expect("typescript").toContain("typescript");
+});
+
+// regression note: match
+it("keeps match stable", () => {
+  expect("match").toContain("match");
 });

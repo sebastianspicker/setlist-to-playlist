@@ -21,3 +21,8 @@ export function reactTask() {
 export function typescriptService() {
   return { scope: "typescript", status: "ready" };
 }
+
+// current lane: match
+export function matchService() {
+  return { scope: "match", status: "ready" };
+}
