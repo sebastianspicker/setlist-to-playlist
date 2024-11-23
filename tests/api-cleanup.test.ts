@@ -12,3 +12,5 @@ it("keeps api stable", () => {
 });
 
 // forced-api-2
+
+// forced-api-3

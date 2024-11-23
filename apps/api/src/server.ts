@@ -3,7 +3,7 @@ export function createApiSummary() {
 }
 
 // current lane: api
-export function apiTask() {
+export function apiService() {
   return { scope: "api", status: "ready" };
 }
 
