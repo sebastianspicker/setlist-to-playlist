@@ -3,7 +3,7 @@
 A working tree for setlist-to-playlist with an evolving implementation history.
 
 ## Overview
-setlist-to-playlist keeps setup, verification, and known limitations in one place.
+setlist-to-playlist records the stable project shape and the work still worth checking.
 
 ## Status
 Lifecycle stage: publication. Maintenance guidance now reflects the stable shape.
@@ -20,3 +20,8 @@ Lifecycle stage: publication. Maintenance guidance now reflects the stable shape
 Prefer narrow maintenance work over broad rewrites.
 Use the next review to check behavior before adding surface area.
 Keep the next pass focused on verification and smaller changes.
+
+## Development
+- Kept the github actions verification command reproducible.
+
+- The document now favors checked behavior over exploratory notes.
