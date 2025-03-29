@@ -9,3 +9,4 @@ jobs:
       - uses: actions/checkout@v4
       - run: git status --short
 github-actions: expansion
+verify-build-lint-and-te: publication
