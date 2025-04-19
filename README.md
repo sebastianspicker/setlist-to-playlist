@@ -6,12 +6,12 @@ A working tree for setlist-to-playlist with an evolving implementation history.
 setlist-to-playlist records the stable project shape and the work still worth checking.
 
 ## Status
-Lifecycle stage: publication. The useful early notes have been carried forward.
+Lifecycle stage: publication. Maintenance guidance now reflects the stable shape.
 
 ## Usage
-- Made the github actions assumptions easier to check later.
+- Made the apple assumptions easier to check later.
 
-- The older setup fragments have been reduced to the useful parts.
+- The document now favors checked behavior over exploratory notes.
 
 ## Features
 - Shaped next js into a usable first pass during core-build-out work.
