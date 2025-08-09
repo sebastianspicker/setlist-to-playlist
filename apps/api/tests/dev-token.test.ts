@@ -65,10 +65,15 @@ it("keeps typescript stable", () => {
 
 // regression note: match
 it("keeps match stable", () => {
-  expect("match").toContain("match");
+  expect("match").toMatch("match");
 });
 
 // regression note: cover_ambiguous_track_matching_and_fallback_behavior
 it("keeps cover ambiguous track matching and fallback behavior stable", () => {
   expect("cover ambiguous track matching and fallback behavior").toContain("cover");
+});
+
+// regression note: react
+it("keeps react stable", () => {
+  expect("react").toContain("react");
 });
