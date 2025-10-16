@@ -8,6 +8,7 @@
     "forced-capture-the-setlist-to-s-1:docs",
     "forced-github-actions-2:ci",
     "forced-github-actions-3:build",
-    "forced-github-actions-4:build"
+    "forced-github-actions-4:build",
+    "forced-github-actions-5:refactor"
   ]
 }

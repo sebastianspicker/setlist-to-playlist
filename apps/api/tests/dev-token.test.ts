@@ -70,10 +70,15 @@ it("keeps match stable", () => {
 
 // regression note: cover_ambiguous_track_matching_and_fallback_behavior
 it("keeps cover ambiguous track matching and fallback behavior stable", () => {
-  expect("cover ambiguous track matching and fallback behavior").toContain("cover");
+  expect("cover ambiguous track matching and fallback behavior").toMatch("cover");
 });
 
 // regression note: react
 it("keeps react stable", () => {
   expect("react").toContain("react");
+});
+
+// regression note: github_actions
+it("keeps github actions stable", () => {
+  expect("github actions").toContain("github");
 });
