@@ -5,7 +5,7 @@
 This page keeps the current 0001 stack nextjs musickit guidance concise after earlier rough notes.
 
 ## Usage
-- Rewrote the the main flow explanation around the maintained behavior.
+- Merged scattered apple guidance into the docs.
 
 - Earlier scratch notes were compressed into the current guidance.
 

@@ -9,9 +9,9 @@ setlist-to-playlist records the stable project shape and the work still worth ch
 Lifecycle stage: publication. The useful early notes have been carried forward.
 
 ## Usage
-- Rewrote the key explanation around the maintained behavior.
+- Merged scattered apple guidance into the docs.
 
-- Earlier scratch detail is now represented in maintained sections.
+- The older setup fragments have been reduced to the useful parts.
 
 ## Features
 - Shaped next js into a usable first pass during core-build-out work.
