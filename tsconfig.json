@@ -10,6 +10,7 @@
     "forced-github-actions-3:build",
     "forced-github-actions-4:build",
     "forced-github-actions-5:refactor",
-    "forced-github-actions-6:test"
+    "forced-github-actions-6:test",
+    "forced-github-actions-7:build"
   ]
 }
