@@ -10,3 +10,5 @@ describe("vitest", () => {
 it("keeps vitest stable", () => {
   expect("vitest").toContain("vitest");
 });
+
+// forced-vitest-2

@@ -31,3 +31,5 @@ export function matchService() {
 export function vitestService() {
   return { scope: "vitest", status: "ready" };
 }
+
+// forced-vitest-8
