@@ -1,0 +1,23 @@
+{
+  "name": "Setlist to Playlist",
+  "short_name": "Setlist2Playlist",
+  "description": "Import a setlist from setlist.fm and create an Apple Music playlist.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

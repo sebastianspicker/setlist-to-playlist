@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Env and secrets
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# IDE and OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs and debug
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Test and coverage
+coverage/
+.nyc_output/
+
+# Turbo
+.turbo/
+
+# PWA / optional
+*.webmanifest.bak

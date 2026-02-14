@@ -1,0 +1,1 @@
+Placeholder: design system summary for LLM consumption (tokens, spacing, components, tone).

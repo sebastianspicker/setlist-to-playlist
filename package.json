@@ -1,0 +1,21 @@
+{
+  "name": "setlist-to-playlist",
+  "private": true,
+  "scripts": {
+    "build": "pnpm -r run build",
+    "dev": "pnpm --filter web run dev",
+    "lint": "pnpm -r run lint",
+    "test": "pnpm -r run test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.16.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.17.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
