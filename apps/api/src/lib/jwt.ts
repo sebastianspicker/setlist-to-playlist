@@ -1,10 +1,40 @@
+import { createPrivateKey } from "node:crypto";
+import { SignJWT } from "jose";
+
+/** Default token lifetime (Apple allows up to 180 days; we use 1 hour for security). */
+const TOKEN_VALIDITY_SECONDS = 60 * 60;
+
 /**
- * Placeholder: sign Apple Developer Token (JWT).
- * In production: use env APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY
- * and a JWT library (e.g. jose or jsonwebtoken) to mint a token
- * with alg ES256, kid = APPLE_KEY_ID, iss = APPLE_TEAM_ID.
+ * Sign an Apple Developer Token (JWT) for MusicKit.
+ * Uses ES256 with kid = Key ID, iss = Team ID, iat/exp in payload.
+ *
+ * @param teamId - Apple Team ID (iss)
+ * @param keyId - Apple Key ID (kid in header)
+ * @param privateKeyPem - PEM string (contents of .p8 file)
+ * @returns JWT string
  */
-export function signDeveloperToken(_payload: { teamId: string; keyId: string; privateKey: string }): string {
-  // TODO: implement with jose or jsonwebtoken
-  return '';
+export async function signDeveloperToken(params: {
+  teamId: string;
+  keyId: string;
+  privateKeyPem: string;
+}): Promise<string> {
+  const { teamId, keyId, privateKeyPem } = params;
+  // DCI-011: normalize all newline variants (literal \n, CRLF, CR) to \n
+  const normalizedPem = privateKeyPem
+    .replace(/\\n/g, "\n")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n");
+  const keyObject = createPrivateKey({
+    key: normalizedPem,
+    format: "pem",
+  });
+
+  const jwt = await new SignJWT({})
+    .setProtectedHeader({ alg: "ES256", kid: keyId })
+    .setIssuer(teamId)
+    .setIssuedAt()
+    .setExpirationTime(Math.floor(Date.now() / 1000) + TOKEN_VALIDITY_SECONDS)
+    .sign(keyObject);
+
+  return jwt;
 }

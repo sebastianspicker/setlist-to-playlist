@@ -1,0 +1,22 @@
+# Ralph Fix Progress Log (Codex)
+Purpose: Apply code fixes from ralph-audit findings. Findings from ralph-fix/findings/*.json.
+Verification: pnpm lint and pnpm test after each story.
+---
+
+## Fix Checklist
+- [x] FIX-001: 01-api-routes
+- [x] FIX-002: 02-apple-token
+- [x] FIX-003: 03-setlist-proxy
+- [x] FIX-004: 04-core-setlist-matching
+- [x] FIX-005: 05-setlist-import-ui
+- [x] FIX-006: 06-matching-ui
+- [x] FIX-007: 07-playlist-export
+- [x] FIX-008: 08-app-pages-layout
+- [x] FIX-009: 09-config-cors
+- [x] FIX-010: 10-error-handling
+- [x] FIX-011: 11-types
+- [x] FIX-012: 12-tests
+- [x] FIX-013: 13-lib-utils
+- [x] FIX-014: 14-pwa-assets
+- [x] FIX-015: 15-dead-code
+---

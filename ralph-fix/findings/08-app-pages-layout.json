@@ -1,0 +1,15 @@
+{
+  "auditTitle": "App Pages & Layout Deep Audit",
+  "auditDate": "2026-02-14",
+  "filesExamined": 5,
+  "totalFindings": 8,
+  "summary": {
+    "critical": 0,
+    "high": 2,
+    "medium": 4,
+    "low": 2
+  },
+  "findings": [],
+  "auditId": "08-app-pages-layout",
+  "sourceFile": "08-app-pages-layout.md"
+}

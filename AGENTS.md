@@ -21,8 +21,11 @@ How a coding agent (or human) should work in this repo.
 
 ## Tooling
 
-- **Lint:** `pnpm lint` (ESLint or Biome, see root config).
+- **Lint:** `pnpm lint` from root (ESLint; runs in all packages). Fix or exclude only where necessary.
 - **Format:** `pnpm format` or format-on-save per `.editorconfig` / `.prettierrc`.
-- **Test:** `pnpm test` from root runs workspace tests.
+- **Test:** `pnpm test` from root runs workspace tests (core, api, shared, web). Run before pushing.
+- **Build:** `pnpm build` from root builds all packages.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to verify your work locally (lint, test, format).
 
 Use this file as the single source of truth for agent and contributor behavior.

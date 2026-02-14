@@ -1,0 +1,27 @@
+{
+  "auditTitle": "Lib & Utils Deep Audit",
+  "auditDate": "2026-02-14T12:42:13+01:00",
+  "filesExamined": 20,
+  "totalFindings": 18,
+  "summary": {
+    "critical": 3,
+    "high": 3,
+    "medium": 4,
+    "low": 8
+  },
+  "findings": [
+    {
+      "severity": "CRITICAL",
+      "number": 1,
+      "title": "Localhost CORS allowlist check is prefix-based and spoofable",
+      "file": "apps/web/src/lib/cors.ts",
+      "lines": "7-17",
+      "category": "will-break",
+      "description": "`getAllowOrigin()` treats any Origin string that *starts with* `http://localhost` or `http://127.0.0.1` as a “local origin”. This can be bypassed by attacker-controlled origins like `http://localhost.evil.com` (or similar prefix tricks), causing `Access-Control-Allow-Origin` to be returned for an unintended origin whenever `ALLOWED_ORIGIN` is unset (or when `configured.split(\",\")[0]` is empty and fallback logic applies).",
+      "code": null,
+      "whyThisMatters": ""
+    }
+  ],
+  "auditId": "13-lib-utils",
+  "sourceFile": "13-lib-utils.md"
+}

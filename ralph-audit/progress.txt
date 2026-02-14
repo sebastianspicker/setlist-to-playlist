@@ -1,0 +1,24 @@
+# Ralph Audit Progress Log (Codex) – Setlist to Playlist
+Started: 2026-02-14
+Purpose: Deep code audit – document broken logic, unfinished features, code slop, dead ends, stubs, and things that will break. No fixes.
+Output: ralph-audit/audit/*.md
+---
+
+## Audit Checklist
+- [x] AUDIT-001: Next.js API Routes
+- [x] AUDIT-002: Apple Developer Token & JWT
+- [x] AUDIT-003: setlist.fm Proxy
+- [x] AUDIT-004: Core Setlist & Matching
+- [x] AUDIT-005: Setlist Import UI
+- [x] AUDIT-006: Matching UI
+- [x] AUDIT-007: Playlist Export
+- [x] AUDIT-008: App Pages & Layout
+- [x] AUDIT-009: Config, Environment & CORS
+- [x] AUDIT-010: Error Handling
+- [x] AUDIT-011: Types & Interfaces
+- [x] AUDIT-012: Tests
+- [x] AUDIT-013: Lib & Utils
+- [x] AUDIT-014: PWA & Static Assets
+- [x] AUDIT-015: Dead Code & Unused Files
+- [x] AUDIT-016: Final Consolidation & Index
+---

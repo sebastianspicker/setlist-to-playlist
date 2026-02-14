@@ -6,6 +6,9 @@ node_modules/
 .env
 .env.local
 .env.*.local
+.env.development
+.env.test
+.env.production
 
 # Build outputs
 .next/
@@ -13,25 +16,71 @@ out/
 dist/
 build/
 *.tsbuildinfo
+.vercel/
+.netlify/
 
 # IDE and OS
 .idea/
 .vscode/
+*.sublime-project
+*.sublime-workspace
 *.swp
+*.swo
+*~
 .DS_Store
 Thumbs.db
+*.lnk
+.Spotlight-V100
+.Trashes
 
 # Logs and debug
 *.log
 npm-debug.log*
 pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
 
 # Test and coverage
 coverage/
 .nyc_output/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
 
-# Turbo
+# Caches
 .turbo/
+.eslintcache
+.stylelintcache
+.parcel-cache
+.cache/
+
+# Backup and temp
+*.bak
+*.backup
+.tmp/
+.temp/
+tmp/
+temp/
 
 # PWA / optional
 *.webmanifest.bak
+
+# Ralph Audit
+ralph-audit/.last-message.md
+ralph-audit/.last-story
+ralph-audit/.model-check.log
+ralph-audit/.prompt.md
+ralph-audit/.story-attempts
+ralph-audit/run.log
+ralph-audit/events.log
+
+# Ralph Fix
+ralph-fix/.last-message.md
+ralph-fix/.last-story
+ralph-fix/.model-check.log
+ralph-fix/.prompt.md
+ralph-fix/.story-attempts
+ralph-fix/run.log
+ralph-fix/events.log

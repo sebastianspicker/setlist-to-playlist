@@ -1,2 +1,3 @@
-// Matching feature: show setlist entry → Apple Music track, allow correction.
-export {};
+export { ConnectAppleMusic } from "./ConnectAppleMusic";
+export { MatchingView } from "./MatchingView";
+export type { MatchRow } from "./MatchingView";

@@ -1,0 +1,148 @@
+{
+  "auditTitle": "Playlist Export Deep Audit",
+  "auditDate": "2026-02-14T10:46:29Z",
+  "filesExamined": 3,
+  "totalFindings": 12,
+  "summary": {
+    "critical": 0,
+    "high": 5,
+    "medium": 5,
+    "low": 2
+  },
+  "findings": [
+    {
+      "severity": "HIGH",
+      "number": 1,
+      "title": "Playlist can be created but left empty/orphaned when add-tracks fails",
+      "file": "apps/web/src/features/playlist-export/CreatePlaylistView.tsx",
+      "lines": "56-64",
+      "category": "will-break",
+      "description": "The flow creates the playlist first, then attempts to add tracks. If adding tracks fails (network/API/auth/etc.), the UI still marks the playlist as created (`setCreated({ id, url })`) and surfaces an error, but nothing in the flow prevents leaving an empty (or partially populated) playlist in the user’s library.",
+      "code": "const { id, url } = await createLibraryPlaylist(name);\ntry {\n  await addTracksToLibraryPlaylist(id, songIds);\n  setCreated({ id, url });\n} catch (addErr) {\n  setCreated({ id, url });\n  setAddTracksError(/* ... */);\n}",
+      "whyThisMatters": "Users can end up with unintended empty/partial playlists in their Apple Music library, and the UI has no cleanup or “did anything actually get added?” certainty."
+    },
+    {
+      "severity": "HIGH",
+      "number": 2,
+      "title": "“Retry add tracks” can duplicate tracks because it always re-sends the full list",
+      "file": "apps/web/src/features/playlist-export/CreatePlaylistView.tsx",
+      "lines": "73-85",
+      "category": "will-break",
+      "description": "When add-tracks fails, the retry path replays the entire `songIds` list against the same playlist ID, with no tracking of what may have already been added (including partial success cases).",
+      "code": "await addTracksToLibraryPlaylist(created.id, songIds);\nsetAddTracksError(null);",
+      "whyThisMatters": "If the first add attempt partially succeeded (or succeeded but the client observed failure), retrying can add duplicates to the playlist."
+    },
+    {
+      "severity": "HIGH",
+      "number": 3,
+      "title": "Invalid IDs can still be added, then the function throws afterward (high duplicate risk on retry)",
+      "file": "apps/web/src/lib/musickit.ts",
+      "lines": "246-274",
+      "category": "broken-logic",
+      "description": "`addTracksToLibraryPlaylist` filters invalid IDs and posts *only valid IDs* to Apple Music. After the API call returns, it throws an error if any IDs were dropped. This creates a “success (some tracks added) + throw” outcome.",
+      "code": "const validIds = songIds.filter((id) => typeof id === \"string\" && id.trim().length > 0);\n// ...\nconst res = (await music.music.api(path, { method: \"POST\", data })) as /* ... */;\nif (validIds.length < songIds.length) {\n  const dropped = songIds.length - validIds.length;\n  throw new Error(`${dropped} of ${songIds.length} IDs were invalid and skipped; ${validIds.length} tracks added.`);\n}",
+      "whyThisMatters": "The UI treats this as “adding tracks failed” and offers a retry; retrying re-adds the already-added valid tracks, producing duplicates (and a confusing “failed” state despite progress)."
+    },
+    {
+      "severity": "HIGH",
+      "number": 4,
+      "title": "Auth revocation during add-tracks leaves the user stuck (no re-auth path in created state)",
+      "file": "apps/web/src/features/playlist-export/CreatePlaylistView.tsx",
+      "lines": "92-147",
+      "category": "will-break",
+      "description": "Once `created` is set, the UI switches to the “Playlist created” view and no longer renders the Apple Music connect UI. If add-tracks fails due to authorization being revoked/expired, the user can only retry add-tracks, which will continue failing; `needsAuth` is never set in this state.",
+      "code": "if (created) {\n  // ... shows retry button when addTracksError exists\n}",
+      "whyThisMatters": "A common failure mode (“Not authorized…”) can’t be recovered from within the created view, causing a dead-end UX."
+    },
+    {
+      "severity": "HIGH",
+      "number": 5,
+      "title": "No chunking/size handling for large track lists (single POST may exceed API limits)",
+      "file": "apps/web/src/lib/musickit.ts",
+      "lines": "242-263",
+      "category": "will-break",
+      "description": "All valid track IDs are sent in a single POST payload. There is no chunking, max-size enforcement, or progressive add behavior.",
+      "code": "const data = {\n  data: validIds.map((id) => ({ id: id.trim(), type: \"songs\" as const })),\n};\nconst res = (await music.music.api(path, { method: \"POST\", data })) as /* ... */;",
+      "whyThisMatters": "For larger setlists, this can fail after playlist creation (creating orphan/partial playlists) depending on Apple API limits and payload constraints."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 6,
+      "title": "`isMusicKitAuthorized()` hides init/config failures, misclassifying them as “needs auth”",
+      "file": "apps/web/src/lib/musickit.ts",
+      "lines": "140-147",
+      "category": "will-break",
+      "description": "`isMusicKitAuthorized()` catches *all* errors from `initMusicKit()` and returns `false`. In the create flow, `false` triggers the “Connect Apple Music” prompt, even when the real problem is missing `NEXT_PUBLIC_APPLE_MUSIC_APP_ID`, dev-token API failure, or MusicKit script load failure.",
+      "code": "export async function isMusicKitAuthorized(): Promise<boolean> {\n  try {\n    const music = await initMusicKit();\n    return music.isAuthorized === true;\n  } catch {\n    return false;\n  }\n}",
+      "whyThisMatters": "Users get directed to re-authenticate when authentication isn’t the root cause, masking actionable errors and creating a loop of failed retries."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 7,
+      "title": "No playlist URL fallback when `url` is missing/unsafe (only generic instruction)",
+      "file": "apps/web/src/features/playlist-export/CreatePlaylistView.tsx",
+      "lines": "93-145",
+      "category": "unfinished",
+      "description": "If `created.url` is missing or not `http(s)`, the UI falls back to a generic message (“check your library”). There is no fallback derivation from playlist ID, no display of playlist ID, and no other navigation affordance.",
+      "code": "const rawUrl = created.url?.trim();\nconst isSafeUrl = rawUrl && (rawUrl.startsWith(\"http://\") || rawUrl.startsWith(\"https://\"));\n// ...\n{isSafeUrl ? <a href={rawUrl}>Open in Apple Music →</a> : <p>check your library...</p>}",
+      "whyThisMatters": "Even when the playlist was created successfully, users may be unable to find/open it via the app, especially if add-tracks failed and the link is also suppressed by the error-state branch."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 8,
+      "title": "MusicKit instance is cached indefinitely; developer token refresh logic may be bypassed after first init",
+      "file": "apps/web/src/lib/musickit.ts",
+      "lines": "43-50, 96-122",
+      "category": "will-break",
+      "description": "The module implements a developer token TTL cache, but once `configuredInstance` is set, subsequent calls to `initMusicKit()` return early and never re-run configuration with a refreshed developer token.",
+      "code": "let configuredInstance: MusicKitInstance | null = null;\n\nexport async function initMusicKit(): Promise<MusicKitInstance> {\n  if (configuredInstance) return configuredInstance;\n  const token = await fetchDeveloperToken();\n  const MusicKit = await waitForMusicKit();\n  MusicKit.configure({ developerToken: token, /* ... */ });\n  configuredInstance = MusicKit.getInstance();\n  return configuredInstance;\n}",
+      "whyThisMatters": "If the configured developer token expires during a long-lived session, playlist create/add flows can fail later with no in-module path to refresh configuration (behavior depends on MusicKit internals, but the module’s own refresh cache is effectively one-shot)."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 9,
+      "title": "“Create playlist” button gating uses a count that may not match `songIds` (can enable a no-op create)",
+      "file": "apps/web/src/features/playlist-export/CreatePlaylistView.tsx",
+      "lines": "35, 50-54, 152-185",
+      "category": "broken-logic",
+      "description": "`songIds` is derived via optional chaining and truthy filtering; `count` is derived via `appleTrack !== null`. If `appleTrack` can be `undefined` (distinct from `null`), `count` may be > 0 while `songIds.length === 0`. The button enables based on `count`, but the handler errors based on `songIds`.",
+      "code": "const songIds = matchRows.map((r) => r.appleTrack?.id).filter(Boolean) as string[];\nconst count = matchRows.filter((m) => m.appleTrack !== null).length;\n\n<button disabled={loading || count === 0}>Create playlist</button>",
+      "whyThisMatters": "Users can click “Create playlist” and then immediately get “No tracks to add…” despite the UI claiming tracks are ready."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 10,
+      "title": "Retry add-tracks uses live `matchRows`-derived IDs, not a snapshot of what the playlist was created for",
+      "file": "apps/web/src/features/playlist-export/CreatePlaylistView.tsx",
+      "lines": "35, 73-85, 92-149",
+      "category": "will-break",
+      "description": "`songIds` is computed from current `matchRows` props each render. After a playlist is created (`created` state set), retries still use the current `songIds`, not a snapshot captured at create time.",
+      "code": "const songIds = matchRows.map((r) => r.appleTrack?.id).filter(Boolean) as string[];\n// later, after created:\nawait addTracksToLibraryPlaylist(created.id, songIds);",
+      "whyThisMatters": "If the parent updates `matchRows` while this component remains mounted (navigation back/forward, edits in other steps, async updates), retrying can add an unintended set of tracks to an already-created playlist."
+    },
+    {
+      "severity": "LOW",
+      "number": 11,
+      "title": "Unused imports in `CreatePlaylistView` (noise/maintenance risk)",
+      "file": "apps/web/src/features/playlist-export/CreatePlaylistView.tsx",
+      "lines": "7-10",
+      "category": "slop",
+      "description": "`authorizeMusicKit` and `initMusicKit` are imported but never referenced in this file.",
+      "code": "import {\n  isMusicKitAuthorized,\n  authorizeMusicKit,\n  initMusicKit,\n  createLibraryPlaylist,\n  addTracksToLibraryPlaylist,\n} from \"@/lib/musickit\";",
+      "whyThisMatters": "Increases cognitive load and suggests refactors in progress; also risks lint failures depending on repo rules."
+    },
+    {
+      "severity": "LOW",
+      "number": 12,
+      "title": "`waitForMusicKit()` does not clear its timeout after resolve (minor async slop)",
+      "file": "apps/web/src/lib/musickit.ts",
+      "lines": "73-93",
+      "category": "slop",
+      "description": "When MusicKit becomes available, the interval is cleared and the promise resolves, but the `setTimeout` handler remains scheduled and will still fire later (calling `reject` after resolution, which is ignored but still runs).",
+      "code": "const check = setInterval(() => { /* resolve when available */ }, 50);\nsetTimeout(() => {\n  clearInterval(check);\n  reject(new Error(\"MusicKit script did not load\"));\n}, 10000);",
+      "whyThisMatters": "Minor unnecessary work and confusing control flow during debugging; also makes timing-related issues harder to reason about."
+    }
+  ],
+  "auditId": "07-playlist-export",
+  "sourceFile": "07-playlist-export.md"
+}

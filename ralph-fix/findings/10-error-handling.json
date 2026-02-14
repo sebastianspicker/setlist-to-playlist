@@ -1,0 +1,15 @@
+{
+  "auditTitle": "Error Handling",
+  "auditDate": "2026-02-14T11:09:59Z",
+  "filesExamined": 37,
+  "totalFindings": 15,
+  "summary": {
+    "critical": 0,
+    "high": 3,
+    "medium": 10,
+    "low": 2
+  },
+  "findings": [],
+  "auditId": "10-error-handling",
+  "sourceFile": "10-error-handling.md"
+}

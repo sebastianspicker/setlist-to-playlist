@@ -1,0 +1,27 @@
+{
+  "auditTitle": "Next.js API Routes Deep Audit",
+  "auditDate": "2026-02-14T10:08:03Z",
+  "filesExamined": 3,
+  "totalFindings": 14,
+  "summary": {
+    "critical": 2,
+    "high": 5,
+    "medium": 4,
+    "low": 3
+  },
+  "findings": [
+    {
+      "severity": "CRITICAL",
+      "number": 1,
+      "title": "`GET /api/apple/dev-token` is publicly callable; CORS does not prevent non-browser access",
+      "file": "apps/web/src/app/api/apple/dev-token/route.ts",
+      "lines": "9-15",
+      "category": "will-break",
+      "description": "This route issues an Apple MusicKit Developer Token to any caller. The only “restriction” in this module is CORS headers (via `corsHeaders(request)`), but CORS is enforced by browsers—not by the server. Any non-browser client (curl, server script, bot) can call this endpoint and receive a valid `token` response regardless of `Origin` / CORS behavior.",
+      "code": null,
+      "whyThisMatters": ""
+    }
+  ],
+  "auditId": "01-api-routes",
+  "sourceFile": "01-api-routes.md"
+}
