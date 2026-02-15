@@ -6,11 +6,12 @@
 - Keep PRs focused; link to issues or exec plans if applicable.
 - Ensure CI passes (lint, test, build).
 
-## Lint / Test / Format
+## Lint / Test / Format / Build
 
 - **Lint:** Run `pnpm lint` from the repo root. Fix any reported issues before pushing.
 - **Test:** Run `pnpm test`. New logic in `packages/core` or shared code should include tests.
-- **Format:** Use the project formatter (Prettier or Biome). Run `pnpm format` or rely on editor format-on-save with `.editorconfig` / config in repo.
+- **Format:** Use Prettier (project config in repo). Run `pnpm format` or rely on editor format-on-save with `.editorconfig`.
+- **Build:** Run `pnpm build` to build all workspace packages; ensure it succeeds before pushing.
 
 ## No Secrets
 

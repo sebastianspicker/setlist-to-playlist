@@ -1,72 +1,30 @@
-# Types & Interfaces Findings
+# Types & Interfaces Deep Audit Findings
 
-Audit Date: 2026-02-14T11:21:05Z  
-Files Examined: 39  
-Total Findings: 16  
+Audit Date: 2026-02-15  
+Files Examined: 35  
+Total Findings: 17  
 
 ## Summary by Severity
-- Critical: 0
-- High: 3
-- Medium: 11
-- Low: 2
-
----
-
-## Files Examined
-- `packages/core/src/apple/index.ts`
-- `packages/core/src/apple/types.ts`
-- `packages/core/src/index.ts`
-- `packages/core/src/matching/index.ts`
-- `packages/core/src/matching/normalize.ts`
-- `packages/core/src/matching/search-query.ts`
-- `packages/core/src/matching/types.ts`
-- `packages/core/src/setlist/index.ts`
-- `packages/core/src/setlist/mapper.ts`
-- `packages/core/src/setlist/setlistfm-types.ts`
-- `packages/core/src/setlist/types.ts`
-- `packages/core/tests/normalize.test.ts`
-- `packages/core/tests/search-query.test.ts`
-- `packages/core/tests/setlist-mapper.test.ts`
-- `apps/api/src/index.ts`
-- `apps/api/src/lib/jwt.ts`
-- `apps/api/src/lib/setlistfm.ts`
-- `apps/api/src/routes/apple/dev-token.ts`
-- `apps/api/src/routes/health.ts`
-- `apps/api/src/routes/setlist/proxy.ts`
-- `apps/web/src/app/api/apple/dev-token/route.ts`
-- `apps/web/src/app/api/health/route.ts`
-- `apps/web/src/app/api/setlist/proxy/route.ts`
-- `apps/web/src/app/error.tsx`
-- `apps/web/src/app/global-error.tsx`
-- `apps/web/src/app/layout.tsx`
-- `apps/web/src/app/page.tsx`
-- `apps/web/src/features/matching/ConnectAppleMusic.tsx`
-- `apps/web/src/features/matching/MatchingView.tsx`
-- `apps/web/src/features/matching/index.ts`
-- `apps/web/src/features/playlist-export/CreatePlaylistView.tsx`
-- `apps/web/src/features/playlist-export/index.ts`
-- `apps/web/src/features/setlist-import/SetlistImportView.tsx`
-- `apps/web/src/features/setlist-import/SetlistPreview.tsx`
-- `apps/web/src/features/setlist-import/index.ts`
-- `apps/web/src/lib/api.ts`
-- `apps/web/src/lib/config.ts`
-- `apps/web/src/lib/cors.ts`
-- `apps/web/src/lib/musickit.ts`
+- Critical: 2
+- High: 2
+- Medium: 9
+- Low: 4
 
 ---
 
 ## Findings
 
-### [HIGH] Finding #1: setlist.fm “sets” shape mismatch risk (`set` vs `sets: { set: ... }`) can silently drop all songs
+### [CRITICAL] Finding #1: `SetlistFmResponse` models `set` but real responses use `sets: { set: ... }` (songs can be dropped)
+
 **File:** `packages/core/src/setlist/setlistfm-types.ts`  
-**Lines:** 34-42  
+**Lines:** 34-44  
 **Category:** will-break  
 
 **Description:**
-`SetlistFmResponse` models the set structure as a top-level `set?: SetlistFmSet[]`. Official setlist.fm docs describe a top-level `set` array, but setlist.fm community reports indicate real API responses can instead return `sets: { set: [...] }` (a wrapper object), creating a shape mismatch at the exact field the app relies on for songs. With the current types, that wrapper shape is not representable, encouraging unsafe casts and making it easy for the mapper to “successfully” produce an empty `sets` array (no tracks) rather than failing loudly.
+`SetlistFmResponse` defines `set?: SetlistFmSet[]`, implying the set array is at the top level. Multiple real-world examples show setlist.fm responses using a wrapper object `sets` containing `set` (array). With the current type, downstream code is encouraged to read `raw.set`, and valid responses shaped as `raw.sets.set` will appear as “no sets”.
 
 **Code:**
-```ts
+```typescript
 export interface SetlistFmResponse {
   id: string;
   versionId?: string;
@@ -81,43 +39,75 @@ export interface SetlistFmResponse {
 ```
 
 **Why this matters:**
-If the upstream payload uses a `sets` wrapper, the app will import a setlist with **zero tracks** and proceed through matching/export with empty data, producing broken UX and wrong playlists.
+This can result in silently importing a setlist with **0 tracks**, even when the API returned songs, breaking the core “import → preview → match → export” flow.
 
 ---
 
-### [HIGH] Finding #2: Mapper hardcodes `raw.set` and has no typed path for `sets.set` wrapper
+### [CRITICAL] Finding #2: Mapper only reads `raw.set`, so `raw.sets.set` responses map to empty `sets`
+
 **File:** `packages/core/src/setlist/mapper.ts`  
-**Lines:** 20-25  
+**Lines:** 20-35  
 **Category:** will-break  
 
 **Description:**
-The mapper reads `raw.set` directly. If the upstream response shape is `sets: { set: [...] }`, the mapper will treat it as “no sets” and return `sets: []` without any error, because it defaults to an empty array.
+The mapper uses `Array.isArray(raw.set)` and otherwise treats the setlist as having no sets. If the incoming payload uses `sets: { set: [...] }`, this produces an empty `Setlist.sets` and downstream UIs show zero tracks.
 
 **Code:**
-```ts
+```typescript
 const sets: SetlistEntry[][] = [];
 const fmSets = Array.isArray(raw.set) ? raw.set : [];
 
 for (const fmSet of fmSets) {
   if (!fmSet || typeof fmSet !== "object") continue;
   const songs = Array.isArray(fmSet.song) ? fmSet.song : [];
+  // ...
+}
 ```
 
 **Why this matters:**
-This is a silent failure mode: the type system and runtime checks won’t catch it, and downstream UI logic will just see an empty setlist.
+A valid API response shape mismatch becomes a total functional failure (no songs to preview/match/export) without an obvious error.
 
 ---
 
-### [HIGH] Finding #3: MusicKit JS typings are ad-hoc and conflict with documented `music.api` surface (risk of runtime `undefined` access)
-**File:** `apps/web/src/lib/musickit.ts`  
-**Lines:** 27-35  
+### [HIGH] Finding #3: Web client casts proxy JSON to `SetlistFmResponse` without validating shape (type safety is illusory)
+
+**File:** `apps/web/src/features/setlist-import/SetlistImportView.tsx`  
+**Lines:** 48-72  
 **Category:** will-break  
 
 **Description:**
-The local `MusicKitInstance` type defines a nested `music: { api: (...) => Promise<unknown> }`, and the implementation calls `music.music.api(...)` (e.g. catalog search, playlist creation, add-tracks). Apple’s MusicKit JS documentation shows the instance surface centered on `music.api...` (object with methods), not a nested `music.music.api` function. Because these types are handwritten, TypeScript will accept usages that may not exist at runtime.
+The client parses JSON into `{ error?: string } | SetlistFmResponse`, and on success forcibly casts `data as SetlistFmResponse` and passes it to the mapper. The only “validation” is `!res.ok || "error" in data`, which does not assert required fields (`artist`, `eventDate`, and especially the `set` vs `sets` structure). This can convert a real API payload into a mapped setlist with empty tracks (or throw inside the mapper).
 
 **Code:**
-```ts
+```typescript
+let data: { error?: string } | SetlistFmResponse;
+try {
+  data = (await res.json()) as { error?: string } | SetlistFmResponse;
+} catch { /* ... */ }
+
+if (!res.ok || "error" in data) { /* ... */ }
+
+const mapped = mapSetlistFmToSetlist(data as SetlistFmResponse);
+setSetlist(mapped);
+setStep("preview");
+```
+
+**Why this matters:**
+Type assertions can hide real API drift until runtime, causing broken imports that look “successful” (no explicit error) but contain no songs.
+
+---
+
+### [HIGH] Finding #4: MusicKit JS surface is modeled ad-hoc (`music.music.api`) and conflicts with common/typed `api` surfaces (risk of runtime `undefined`)
+
+**File:** `apps/web/src/lib/musickit.ts`  
+**Lines:** 27-35, 187-190, 222-228, 262-264  
+**Category:** will-break  
+
+**Description:**
+The local `MusicKitInstance` interface defines a `music: { api: (path, options) => Promise<unknown> }`, and all Apple Music calls are made via `music.music.api(...)`. Widely used typings and references for MusicKit JS expose an `api` object on the instance (e.g. `music.api.music(...)`) rather than an extra `.music` nesting. If the real runtime instance does not match this hand-written shape, calls like `music.music.api` will throw (`Cannot read properties of undefined`).
+
+**Code:**
+```typescript
 interface MusicKitInstance {
   authorize(): Promise<string>;
   unauthorize(): Promise<void>;
@@ -127,70 +117,51 @@ interface MusicKitInstance {
     api: (path: string, options?: { method?: string; data?: unknown }) => Promise<unknown>;
   };
 }
+
+// Usage:
+const data = (await music.music.api(path)) as { /* ... */ };
 ```
 
 **Why this matters:**
-If the runtime instance does not match this guessed shape, calls like `music.music.api(...)` can throw (e.g. “Cannot read properties of undefined”), breaking matching and playlist export flows.
+This is a single-point-of-failure abstraction: if the real MusicKit API surface differs, **catalog search, playlist create, and add-tracks all fail**.
 
 ---
 
-### [MEDIUM] Finding #4: `SetlistFmResponse` omits documented `lastUpdated` field (and treats `versionId` as optional)
+### [MEDIUM] Finding #5: `SetlistFmVenue.city` / `country` shape is truncated and has incorrect required fields vs observed payloads
+
 **File:** `packages/core/src/setlist/setlistfm-types.ts`  
-**Lines:** 34-44  
+**Lines:** 13-18  
 **Category:** slop  
 
 **Description:**
-Official setlist.fm setlist docs include `lastUpdated` and show `versionId` as a normal field. This type omits `lastUpdated` entirely and makes `versionId` optional. Even if the app doesn’t currently use `lastUpdated`, exporting these types from `@repo/core` makes them part of a public contract and increases drift risk.
+`city` is modeled as `{ name: string; country?: { code: string } }`, but observed payloads commonly include `city.id`, `state`, `stateCode`, `coords`, and `country.name`, and may include empty objects for `country` in some cases. As written, if `country` is present but missing `code`, the type encourages unsafe access patterns.
 
 **Code:**
-```ts
-export interface SetlistFmResponse {
-  id: string;
-  versionId?: string;
-  eventDate: string;
-  artist: SetlistFmArtist;
-  // ...
-}
-```
-
-**Why this matters:**
-Missing/incorrect fields in a “source-of-truth” API type encourage downstream `as any`/casting, and can cause subtle bugs when new features start relying on fields that the types claim don’t exist.
-
----
-
-### [MEDIUM] Finding #5: `SetlistFmArtist` is missing documented `disambiguation` (and other known fields)
-**File:** `packages/core/src/setlist/setlistfm-types.ts`  
-**Lines:** 6-11  
-**Category:** slop  
-
-**Description:**
-setlist.fm docs show `artist.disambiguation` as part of the artist shape. The core type doesn’t include it, and it also doesn’t model other commonly present fields seen in docs/examples. This is a partial type presented as “Types for the setlist.fm REST API response”, which increases mismatch risk for consumers.
-
-**Code:**
-```ts
-export interface SetlistFmArtist {
+```typescript
+export interface SetlistFmVenue {
   name: string;
-  mbid?: string;
-  sortName?: string;
+  id?: string;
+  city?: { name: string; country?: { code: string } };
   url?: string;
 }
 ```
 
 **Why this matters:**
-Consumers of `@repo/core` types can’t accurately type against documented responses and may “paper over” mismatches with unsafe casts.
+When UI/logic later starts using location data (city/country), these types can create false confidence and lead to undefined reads or incorrect displays.
 
 ---
 
-### [MEDIUM] Finding #6: `SetlistFmSong.cover` / `with` are `unknown` but documented as `artist` objects
+### [MEDIUM] Finding #6: `SetlistFmSong.cover` / `with` typed as `unknown` despite being documented/observed as artist objects
+
 **File:** `packages/core/src/setlist/setlistfm-types.ts`  
 **Lines:** 20-26  
 **Category:** slop  
 
 **Description:**
-setlist.fm docs model `cover` and `with` as objects (artist-like). Typing them as `unknown` is an overuse of `unknown` that prevents safe access and invites untyped narrowing/casting wherever they’re needed.
+`cover` and `with` are typed as `unknown`, losing a clear domain shape (artist-like objects). This pushes consumers toward unsafe casting or ignoring useful metadata.
 
 **Code:**
-```ts
+```typescript
 export interface SetlistFmSong {
   name: string;
   info?: string;
@@ -201,43 +172,46 @@ export interface SetlistFmSong {
 ```
 
 **Why this matters:**
-This reduces type safety precisely where the upstream schema is known and stable enough to model, and it makes it harder to correctly support covers/guest artists in the future.
+It prevents type-safe handling of common setlist features (covers, guest performers) and increases the chance of ad-hoc casts later.
 
 ---
 
-### [MEDIUM] Finding #7: `SetlistFmVenue.city` shape is heavily truncated vs docs (and `venue.id` is optional)
+### [MEDIUM] Finding #7: `SetlistFmResponse` omits `lastUpdated` and weakens `versionId` / `url` optionality compared to documented contracts
+
 **File:** `packages/core/src/setlist/setlistfm-types.ts`  
-**Lines:** 13-18  
+**Lines:** 34-44  
 **Category:** slop  
 
 **Description:**
-Docs show `venue.city` containing fields like `id`, `state`, `stateCode`, `coords`, plus `country` as an object (not just `{ code }`). This type reduces city to `{ name; country?: { code } }` and makes both `venue.id` and `city` optional. Even if the app doesn’t currently use these fields, this is presented as an API response type and re-exported publicly.
+The type does not include `lastUpdated`, and marks `versionId` and `url` optional. Documentation indicates `lastUpdated` and `url` exist on the Setlist object; weakening these fields makes it easy to forget attribution (`url`) and obscures update/refresh logic (`lastUpdated`, `versionId`).
 
 **Code:**
-```ts
-export interface SetlistFmVenue {
-  name: string;
-  id?: string;
-  city?: { name: string; country?: { code: string } };
+```typescript
+export interface SetlistFmResponse {
+  id: string;
+  versionId?: string;
+  eventDate: string;
+  // ...
   url?: string;
 }
 ```
 
 **Why this matters:**
-Downstream code may assume the real payload matches these definitions and lose access to documented fields without realizing they exist.
+Missing/optional attribution fields can become a compliance/UX issue, and missing update metadata makes caching/refresh behavior harder to reason about.
 
 ---
 
-### [MEDIUM] Finding #8: `SetlistFmSet.song` is required in the type, but implementation treats it as optional/malformed
+### [MEDIUM] Finding #8: `SetlistFmSet.song` is required in the type, but mapper treats it as optional/malformed (type and runtime expectations disagree)
+
 **File:** `packages/core/src/setlist/setlistfm-types.ts`  
 **Lines:** 28-32  
-**Category:** will-break  
+**Category:** slop  
 
 **Description:**
-The type claims every set always has `song: SetlistFmSong[]`. In practice, the mapper treats `fmSet.song` as unknown and guards with `Array.isArray`. This mismatch means the TypeScript types do not reflect the runtime contract the code is written against.
+The type requires `song: SetlistFmSong[]`, but the mapper defensively does `Array.isArray(fmSet.song) ? fmSet.song : []`, implying `song` may be missing or non-array at runtime. This mismatch means the type contract does not reflect real-world variability or the app’s own defensive posture.
 
 **Code:**
-```ts
+```typescript
 export interface SetlistFmSet {
   name?: string;
   encore?: number;
@@ -246,108 +220,139 @@ export interface SetlistFmSet {
 ```
 
 **Why this matters:**
-When types don’t match runtime realities, developers are forced into repetitive runtime checks and casts, and it becomes unclear what the app actually expects.
+Misleading required fields encourage consumers to skip checks, while production data can still be malformed (or shaped differently), leading to runtime errors or silent data loss.
 
 ---
 
-### [MEDIUM] Finding #9: API proxy returns untyped `unknown` setlist bodies; core API types are not used at the boundary
-**File:** `apps/api/src/routes/setlist/proxy.ts`  
-**Lines:** 6-8  
-**Category:** will-break  
+### [MEDIUM] Finding #9: Mapper’s type guard `s is SetlistFmSong` is unsound (only checks `"name" in s`)
+
+**File:** `packages/core/src/setlist/mapper.ts`  
+**Lines:** 27-33  
+**Category:** slop  
 
 **Description:**
-The proxy response explicitly returns `body: unknown`. This ensures the client boundary has no structural guarantees, yet the web client later casts the JSON into `SetlistFmResponse`. The repo contains setlist.fm types, but they are not used to validate or type the body at the server boundary.
+The filter claims to narrow to `SetlistFmSong` but only asserts that `name` exists as a key, not that `name` is a string (or that other fields match). This undermines the value of the `SetlistFmSong` type within the mapper and can let unexpected values through as if they were valid songs.
 
 **Code:**
-```ts
+```typescript
+.filter((s): s is SetlistFmSong => s != null && typeof s === "object" && "name" in s)
+.map((s) => ({
+  name: s.name ?? "",
+  artist: artistName || undefined,
+  info: s.info ?? undefined,
+}));
+```
+
+**Why this matters:**
+It can propagate non-string `name` values into `SetlistEntry.name` (typed as `string`), causing surprising UI behavior and making debugging harder.
+
+---
+
+### [MEDIUM] Finding #10: Proxy and fetcher return `unknown` bodies, forcing unsafe assertions across the API boundary
+
+**File:** `apps/api/src/routes/setlist/proxy.ts`  
+**Lines:** 6-8  
+**Category:** slop  
+
+**Description:**
+Successful proxy responses carry `body: unknown`, and the proxy does not validate/normalize the upstream response into a known `SetlistFmResponse` shape before returning it.
+
+**Code:**
+```typescript
 export type ProxyResponse =
   | { body: unknown; status: number }
   | { error: string; status: number };
 ```
 
 **Why this matters:**
-This promotes a pattern where the client treats upstream JSON as typed without verification, increasing the risk of runtime shape mismatches (especially around `set` / `sets`).
+Clients must cast to a presumed shape, which can easily drift from reality and break at runtime (especially given `set` vs `sets` uncertainty).
 
 ---
 
-### [MEDIUM] Finding #10: setlist.fm fetcher result type is also `unknown`, reinforcing unsafe casts downstream
+### [MEDIUM] Finding #11: setlist.fm fetcher result type also uses `body: unknown`, reinforcing downstream casts
+
 **File:** `apps/api/src/lib/setlistfm.ts`  
-**Lines:** 70-72  
+**Lines:** 72-74, 96-100  
 **Category:** slop  
 
 **Description:**
-`FetchSetlistResult` returns `{ ok: true; body: unknown }`. This is a second layer where the payload is intentionally untyped, despite the repo having a `SetlistFmResponse` interface. The app currently relies on client-side casting + best-effort mapper guards.
+`FetchSetlistResult` uses `body: unknown` even on `ok: true`, and stores cached payloads as `unknown`. This spreads uncertainty downstream and makes it hard to prove that the mapper receives the expected setlist shape.
 
 **Code:**
-```ts
+```typescript
 export type FetchSetlistResult =
   | { ok: true; body: unknown }
   | { ok: false; status: number; message: string };
+
+body = (await res.json()) as unknown;
 ```
 
 **Why this matters:**
-It increases the probability that setlist.fm schema drift (or wrapper shapes like `sets.set`) will reach the client unnoticed.
+It encourages “cast-and-pray” patterns at the edges and increases the likelihood that shape drift becomes a runtime failure.
 
 ---
 
-### [MEDIUM] Finding #11: Web client casts proxy JSON to `SetlistFmResponse` without validation (type safety is illusory)
-**File:** `apps/web/src/features/setlist-import/SetlistImportView.tsx`  
-**Lines:** 48-63  
-**Category:** will-break  
+### [MEDIUM] Finding #12: `DevTokenResponse` is duplicated and weakened in the web client (union vs “all-optional” object)
 
-**Description:**
-The client parses JSON and immediately treats it as `{ error?: string } | SetlistFmResponse`. Because the upstream body is `unknown`, this cast can easily be wrong. The mapper validates only a small subset of fields, so incorrect shapes can propagate into UI/matching as empty or malformed data rather than being rejected.
-
-**Code:**
-```ts
-const res = await fetch(url, { signal });
-const data = (await res.json()) as { error?: string } | SetlistFmResponse;
-
-// ...
-
-const mapped = mapSetlistFmToSetlist(data as SetlistFmResponse);
-```
-
-**Why this matters:**
-Incorrect type assumptions at the network boundary are a common source of production-only failures (API changes, partial outages returning HTML, wrapper objects, etc.).
-
----
-
-### [MEDIUM] Finding #12: MusicKit `configure()` return type is overly broad and forces “duck-typing thenable” logic
-**File:** `apps/web/src/lib/musickit.ts`  
-**Lines:** 9-12  
+**File:** `apps/api/src/routes/apple/dev-token.ts`  
+**Lines:** 3  
 **Category:** slop  
 
 **Description:**
-`MusicKitGlobal.configure()` is typed as `Promise<MusicKitInstance> | MusicKitInstance | void`, which is so broad that the code must check for a `.then` function at runtime (instead of relying on types). This is a symptom of guessy/inaccurate typings and makes it hard to reason about the real contract.
+The API defines a strict union `{ token } | { error }`, but the client models the parsed JSON as `{ token?: string; error?: string }`, which permits impossible states (`{}` or `{ token, error }`) and loses the mutual exclusivity guarantee.
 
 **Code:**
-```ts
+```typescript
+export type DevTokenResponse = { token: string } | { error: string };
+```
+
+**Why this matters:**
+A weaker client type makes it easier for unexpected server responses to slip through without being caught by TypeScript (and complicates reasoning about control flow).
+
+---
+
+### [MEDIUM] Finding #13: MusicKit `configure()` return type is overly broad, forcing “thenable duck-typing”
+
+**File:** `apps/web/src/lib/musickit.ts`  
+**Lines:** 9-12, 112-120  
+**Category:** slop  
+
+**Description:**
+`configure()` is typed as returning `Promise<MusicKitInstance> | MusicKitInstance | void`, and the implementation checks for `.then` at runtime. This suggests the code does not know the real contract and makes the integration more fragile.
+
+**Code:**
+```typescript
 interface MusicKitGlobal {
   configure(options: MusicKitConfigureOptions): Promise<MusicKitInstance> | MusicKitInstance | void;
   getInstance(): MusicKitInstance;
 }
+
+if (configureResult && typeof (configureResult as Promise<unknown>).then === "function") {
+  await (configureResult as Promise<MusicKitInstance>);
+}
 ```
 
 **Why this matters:**
-It weakens type guarantees and makes the integration fragile across MusicKit script updates.
+If the real return value differs (or is a non-Promise thenable), initialization and all dependent API calls can behave unpredictably.
 
 ---
 
-### [MEDIUM] Finding #13: MusicKit API response typing is under-specified and can silently generate empty-string track names
+### [MEDIUM] Finding #14: MusicKit API response typing is under-specified and can silently produce empty-string track names
+
 **File:** `apps/web/src/lib/musickit.ts`  
-**Lines:** 187-200  
-**Category:** will-break  
+**Lines:** 187-200, 37-41  
+**Category:** slop  
 
 **Description:**
-`searchCatalog()` asserts a partial response shape and then maps `name` to `s.attributes?.name ?? ""`. This allows “tracks” with empty names to be considered valid matches, and it hides whether missing attributes are a genuine API issue vs a typing mismatch.
+The search response is cast with optional `attributes?.name`, and the mapping falls back to `""` when missing. Meanwhile, `AppleMusicTrack.name` is typed as required `string`, implying it’s always meaningful. This mismatch can silently create blank track labels and degrade matching/selection UX.
 
 **Code:**
-```ts
-const data = (await music.music.api(path)) as {
-  results?: { songs?: { data?: Array<{ id: string; attributes?: { name?: string; artistName?: string } }> } };
-  errors?: Array<{ detail?: string; status?: string }>;
-};
+```typescript
+export interface AppleMusicTrack {
+  id: string;
+  name: string;
+  artistName?: string;
+}
 
 const tracks: AppleMusicTrack[] = songs.map((s) => ({
   id: s.id,
@@ -357,20 +362,21 @@ const tracks: AppleMusicTrack[] = songs.map((s) => ({
 ```
 
 **Why this matters:**
-Silent coercion to `""` makes downstream matching and UI behavior incorrect without clear error signals, and it obscures whether the underlying response shape is being handled correctly.
+It hides API/typing issues by substituting empty strings, leading to confusing UI states and potentially worse matching behavior.
 
 ---
 
-### [MEDIUM] Finding #14: Apple track shapes are duplicated across core and web (risk of drift and inconsistent optionality)
+### [MEDIUM] Finding #15: Apple track shapes are duplicated across core and web (risk of drift/inconsistent optionality)
+
 **File:** `packages/core/src/matching/types.ts`  
 **Lines:** 1-5  
 **Category:** slop  
 
 **Description:**
-Core defines `AppleTrack` with `artistName?: string`. Web defines `AppleMusicTrack` with the same fields and optionality (`apps/web/src/lib/musickit.ts:37-41`). These are parallel types representing the same concept, but they live in different packages and are not tied together.
+Core defines `AppleTrack`, while web defines `AppleMusicTrack` with a similar shape. These are parallel contracts that can drift (fields, optionality, meaning) without TypeScript catching mismatches across package boundaries.
 
 **Code:**
-```ts
+```typescript
 export interface AppleTrack {
   id: string;
   name: string;
@@ -379,38 +385,21 @@ export interface AppleTrack {
 ```
 
 **Why this matters:**
-Duplicate “same-shape” types are a common source of subtle bugs when one evolves (e.g., making `artistName` required, adding `url`, changing `id` semantics) and the other doesn’t.
+Type duplication across layers increases maintenance burden and makes subtle inconsistencies (e.g. required vs optional fields) more likely over time.
 
 ---
 
-### [MEDIUM] Finding #15: `DevTokenResponse` is duplicated (discriminated union in API vs “all-optional” shape in web)
-**File:** `apps/api/src/routes/apple/dev-token.ts`  
-**Lines:** 3-3  
-**Category:** slop  
+### [LOW] Finding #16: Placeholder type exported publicly but unused (`AppleCatalogTrack`)
 
-**Description:**
-The API exports a discriminated-by-property union (`{ token } | { error }`). The web client does not import this type and instead uses a weaker `{ token?: string; error?: string }` shape (`apps/web/src/lib/musickit.ts:58-66`). This loses the guarantee that a successful response contains a token and that an error response cannot contain a token.
-
-**Code:**
-```ts
-export type DevTokenResponse = { token: string } | { error: string };
-```
-
-**Why this matters:**
-Type drift here can cause subtle runtime failures (e.g., server returning a malformed payload that still type-checks client-side), and it weakens the safety of the token-fetch path.
-
----
-
-### [LOW] Finding #16: Placeholder types are exported publicly but unused, and do not represent stable API contracts
 **File:** `packages/core/src/apple/types.ts`  
 **Lines:** 1-8  
 **Category:** dead-end  
 
 **Description:**
-`AppleCatalogTrack` is explicitly labeled “Placeholder” and is exported from `@repo/core` (`packages/core/src/apple/index.ts:1`) but is not used anywhere in the repo. Its fields are also highly optional (`attributes?.name?`, `attributes?.artistName?`) even though catalog track resources typically have stable required attributes. Similarly, `AppleTrack`/`MatchResult` are exported but unused (see `packages/core/src/matching/index.ts:1`).
+`AppleCatalogTrack` is explicitly labeled “Placeholder” and exported via `@repo/core` (through `packages/core/src/apple/index.ts`), but no usages exist in the repo. Its high optionality (`attributes?`, `name?`) also indicates it is not a stable contract.
 
 **Code:**
-```ts
+```typescript
 /** Placeholder for Apple Music API types used by core (e.g. catalog track). */
 export interface AppleCatalogTrack {
   id: string;
@@ -422,14 +411,38 @@ export interface AppleCatalogTrack {
 ```
 
 **Why this matters:**
-Exported-but-unused placeholder types increase public surface area and can mislead future code into depending on incomplete or incorrect contracts.
+Dead, placeholder exports tend to rot and can mislead consumers into treating them as authoritative contracts.
 
 ---
 
-## External References (accessed 2026-02-14)
-- https://api.setlist.fm/docs/1.0/json_Setlist.html
-- https://api.setlist.fm/docs/1.0/json_Artist.html
-- https://api.setlist.fm/docs/1.0/json_Venue.html
-- https://api.setlist.fm/docs/1.0/json_Set.html
-- https://www.setlist.fm/forum/setlistfm/setlistfm-api/possible-bug-with-swagger-definition-6bd77efa
-- https://js-cdn.music.apple.com/musickit/v1/index.html
+### [LOW] Finding #17: `Setlist.sets` is required by type but treated as optional in web usage (inconsistent contract assumptions)
+
+**File:** `packages/core/src/setlist/types.ts`  
+**Lines:** 10-21  
+**Category:** slop  
+
+**Description:**
+`Setlist.sets` is required (`SetlistEntry[][]`), but web code frequently uses `setlist.sets ?? []` patterns, implying it may be missing/undefined. This inconsistency suggests the domain contract isn’t trusted by consumers.
+
+**Code:**
+```typescript
+export interface Setlist {
+  // ...
+  /** Ordered list of tracks/songs */
+  sets: SetlistEntry[][];
+}
+```
+
+**Why this matters:**
+It signals contract ambiguity: either the type is too strict for real runtime states, or consumers are defensive due to prior shape problems—both reduce TypeScript’s effectiveness.
+
+---
+
+## External References
+
+- `https://api.setlist.fm/docs/1.0/json_Setlist.html` (accessed 2026-02-15)  
+- `https://api.setlist.fm/forum/12-issues/suggestions/49034497-the-actual-response-doesn-t-match-the-swagger-defin` (accessed 2026-02-15)  
+- `https://api.setlist.fm/forum/12-issues/suggestions/49966162-a-typical-setlist-response-looks-like-sets-set` (accessed 2026-02-15)  
+- `https://stackoverflow.com/questions/70576780/need-help-parsing-the-response-data-from-setlist-fm-api` (accessed 2026-02-15)  
+- `https://app.unpkg.com/@types/musickit-js@1.0.10/files/MusicKit.MusicKitInstance.d.ts` (accessed 2026-02-15)  
+- `https://app.unpkg.com/@types/musickit-js@1.0.10/files/MusicKit.API.d.ts` (accessed 2026-02-15)

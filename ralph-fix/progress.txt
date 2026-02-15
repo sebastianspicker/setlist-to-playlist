@@ -1,22 +1,19 @@
-# Ralph Fix Progress Log (Codex)
-Purpose: Apply code fixes from ralph-audit findings. Findings from ralph-fix/findings/*.json.
-Verification: pnpm lint and pnpm test after each story.
----
+# Ralph Fix Progress
 
-## Fix Checklist
-- [x] FIX-001: 01-api-routes
-- [x] FIX-002: 02-apple-token
-- [x] FIX-003: 03-setlist-proxy
-- [x] FIX-004: 04-core-setlist-matching
-- [x] FIX-005: 05-setlist-import-ui
-- [x] FIX-006: 06-matching-ui
-- [x] FIX-007: 07-playlist-export
-- [x] FIX-008: 08-app-pages-layout
-- [x] FIX-009: 09-config-cors
-- [x] FIX-010: 10-error-handling
-- [x] FIX-011: 11-types
-- [x] FIX-012: 12-tests
-- [x] FIX-013: 13-lib-utils
-- [x] FIX-014: 14-pwa-assets
-- [x] FIX-015: 15-dead-code
----
+Apply code fixes from ralph-audit findings. Full debug: lint, fix, verify (pnpm lint + pnpm test). Implemented fixes documented in ralph-fix/fixes/*.md (audit-style).
+
+- [x] FIX-001: Fix 01-api-routes findings
+- [x] FIX-002: Fix 02-apple-token findings
+- [x] FIX-003: Fix 03-setlist-proxy findings
+- [x] FIX-004: Fix 04-core-setlist-matching findings
+- [x] FIX-005: Fix 05-setlist-import-ui findings
+- [x] FIX-006: Fix 06-matching-ui findings
+- [x] FIX-007: Fix 07-playlist-export findings
+- [x] FIX-008: Fix 08-app-pages-layout findings
+- [x] FIX-009: Fix 09-config-cors findings
+- [x] FIX-010: Fix 10-error-handling findings
+- [x] FIX-011: Fix 11-types findings
+- [x] FIX-012: Fix 12-tests findings
+- [x] FIX-013: Fix 13-lib-utils findings
+- [x] FIX-014: Fix 14-pwa-assets findings
+- [x] FIX-015: Fix 15-dead-code findings

@@ -1,15 +1,192 @@
 {
-  "auditTitle": "Error Handling",
-  "auditDate": "2026-02-14T11:09:59Z",
-  "filesExamined": 37,
-  "totalFindings": 15,
+  "auditTitle": "Error Handling Deep Audit",
+  "auditDate": "2026-02-15",
+  "filesExamined": 41,
+  "totalFindings": 16,
   "summary": {
     "critical": 0,
     "high": 3,
     "medium": 10,
-    "low": 2
+    "low": 3
   },
-  "findings": [],
+  "findings": [
+    {
+      "severity": "MEDIUM",
+      "number": 1,
+      "title": "Segment error boundary renders raw `error.message` to users (potential internal detail exposure)",
+      "file": "apps/web/src/app/error.tsx",
+      "lines": "16-23",
+      "category": "will-break",
+      "description": "The segment-level error boundary displays `error.message` directly in the UI. Many errors in this codebase are thrown with technical details (API “detail” strings, configuration/env variable names, upstream proxy messages). Rendering these messages verbatim can expose internal implementation details and produces inconsistent user-facing messaging.",
+      "code": "const message = error instanceof Error ? error.message : String(error ?? \"Unknown error\");\n\n<p style={{ color: \"#666\", marginTop: \"0.5rem\" }}>\n  {message || \"An error occurred. You can try again.\"}\n</p>",
+      "whyThisMatters": "Users can see low-level error text that varies by failure mode and may reveal internal configuration or upstream service responses."
+    },
+    {
+      "severity": "LOW",
+      "number": 2,
+      "title": "Segment error boundary logs full error object to browser console",
+      "file": "apps/web/src/app/error.tsx",
+      "lines": "12-14",
+      "category": "slop",
+      "description": "The error boundary always `console.error(error)` on the client. If error objects/messages contain sensitive or internal details (including upstream error payload fragments), they are written to the user’s browser console.",
+      "code": "useEffect(() => {\n  console.error(error);\n}, [error]);",
+      "whyThisMatters": "Client console output is user-visible and can unintentionally expose internal diagnostics."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 3,
+      "title": "Global error page renders raw `error.message` and provides no logging/diagnostic signal",
+      "file": "apps/web/src/app/global-error.tsx",
+      "lines": "10-19",
+      "category": "will-break",
+      "description": "The global error UI renders `error.message` verbatim and does not log/report the error anywhere. This combines potential internal-detail exposure with loss of diagnostic context when root-level failures happen.",
+      "code": "const message = error instanceof Error ? error.message : String(error ?? \"Unknown error\");\n\n<p style={{ color: \"#666\", marginTop: \"0.5rem\" }}>\n  {message || \"An unexpected error occurred. You can try again.\"}\n</p>",
+      "whyThisMatters": "Root-level crashes can be hard to diagnose while still showing technical/internal text to end users."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 4,
+      "title": "Developer-token fetch path does not handle network-level fetch rejections; errors can surface as raw thrown messages",
+      "file": "apps/web/src/lib/musickit.ts",
+      "lines": "53-66",
+      "category": "will-break",
+      "description": "`fetchDeveloperToken()` does not guard the `fetch()` call itself. Network failures reject the promise and bypass the “invalid JSON” handling, producing raw thrown errors that bubble to callers. Additionally, it throws `data.error` directly, which is controlled by the server response shape and may contain internal/technical strings.",
+      "code": "const res = await fetch(devTokenUrl());\nlet data: { token?: string; error?: string };\ntry {\n  data = (await res.json()) as { token?: string; error?: string };\n} catch {\n  throw new Error(\"Invalid response from Developer Token API (non-JSON).\");\n}\nif (!res.ok || data.error || !data.token) {\n  throw new Error(data.error ?? \"Failed to get Developer Token\");\n}",
+      "whyThisMatters": "Failures can present as inconsistent, low-level errors depending on whether the failure is network vs. non-OK HTTP vs. invalid JSON, and the thrown strings can propagate into user-facing surfaces."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 5,
+      "title": "`isMusicKitAuthorized()` swallows all errors and returns `false`, conflating auth state with config/network failures",
+      "file": "apps/web/src/lib/musickit.ts",
+      "lines": "140-146",
+      "category": "will-break",
+      "description": "`isMusicKitAuthorized()` catches all errors from `initMusicKit()` (including missing app ID, dev-token fetch failures, MusicKit script load failures) and converts them into `false`. Callers cannot distinguish “not authorized” from “MusicKit is broken/misconfigured”.",
+      "code": "export async function isMusicKitAuthorized(): Promise<boolean> {\n  try {\n    const music = await initMusicKit();\n    return music.isAuthorized === true;\n  } catch {\n    return false;\n  }\n}",
+      "whyThisMatters": "Downstream UI/flows can take incorrect recovery actions (treating hard failures as simple “needs auth”), obscuring the real cause."
+    },
+    {
+      "severity": "LOW",
+      "number": 6,
+      "title": "`waitForMusicKit()` leaves timeout pending after resolve (unnecessary timer; late reject attempt)",
+      "file": "apps/web/src/lib/musickit.ts",
+      "lines": "83-93",
+      "category": "slop",
+      "description": "`waitForMusicKit()` sets an interval and a timeout, but only clears the interval when `window.MusicKit` becomes available. The timeout is never cleared on success; it fires later and calls `reject(...)` after resolve (ignored by Promise semantics, but still executes).",
+      "code": "const check = setInterval(() => {\n  if (window.MusicKit) {\n    clearInterval(check);\n    resolve(window.MusicKit);\n  }\n}, 50);\nsetTimeout(() => {\n  clearInterval(check);\n  reject(new Error(\"MusicKit script did not load\"));\n}, 10000);",
+      "whyThisMatters": "Creates avoidable timers and adds noisy, misleading control flow (timeout path runs even after successful resolve)."
+    },
+    {
+      "severity": "HIGH",
+      "number": 7,
+      "title": "Matching auto-suggestions swallow MusicKit/search errors, producing silent “No match” outcomes",
+      "file": "apps/web/src/features/matching/MatchingView.tsx",
+      "lines": "54-79",
+      "category": "will-break",
+      "description": "The suggestion loop catches all failures from `searchCatalog()` and silently sets `appleTrack: null`. This masks major failures (not authorized, dev-token fetch failure, MusicKit script not loaded, Apple API error responses) as if there were simply no catalog matches.",
+      "code": "try {\n  const tracks = await searchCatalog(query, 1);\n  ...\n  if (next[i]) next[i] = { ...next[i], appleTrack: track };\n} catch {\n  if (cancelled) return;\n  setMatches((prev) => {\n    const next = [...prev];\n    if (next[i]) next[i] = { ...next[i], appleTrack: null };\n    return next;\n  });\n}",
+      "whyThisMatters": "Users receive no signal that matching failed due to system/auth/config issues, and the UI can look “successful” while silently failing."
+    },
+    {
+      "severity": "HIGH",
+      "number": 8,
+      "title": "Manual search swallows MusicKit/search errors and shows empty results with no error UI",
+      "file": "apps/web/src/features/matching/MatchingView.tsx",
+      "lines": "100-113",
+      "category": "will-break",
+      "description": "Manual search catches all `searchCatalog()` errors and replaces results with an empty list, with no error state or messaging. This makes failures indistinguishable from valid “no results”.",
+      "code": "try {\n  const tracks = await searchCatalog(q, 8);\n  setSearchResults(tracks);\n} catch {\n  setSearchResults([]);\n} finally {\n  setSearching(false);\n}",
+      "whyThisMatters": "Users have no actionable understanding of whether Apple Music search failed vs. legitimately found nothing."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 9,
+      "title": "Setlist import surfaces backend/upstream error strings directly to users (inconsistent and potentially internal)",
+      "file": "apps/web/src/features/setlist-import/SetlistImportView.tsx",
+      "lines": "62-77",
+      "category": "will-break",
+      "description": "The import flow displays server-provided `{ error }` verbatim (`setError(message)`), and also displays thrown `err.message` verbatim for other failures (including mapping errors). Since the proxy may forward upstream setlist.fm error text, users can see internal/opaque upstream messages and technical mapping/config errors.",
+      "code": "if (!res.ok || \"error\" in data) {\n  const message = (data as { error?: string }).error ?? `Request failed (${res.status})`;\n  setError(message);\n  ...\n  return;\n}\n\n...\n\n} catch (err) {\n  ...\n  setError(err instanceof Error ? err.message : String(err ?? \"Network error\"));\n  setSetlist(null);\n}",
+      "whyThisMatters": "User-visible errors vary widely in phrasing/detail and can reflect upstream/internal messages rather than consistent UX-level errors."
+    },
+    {
+      "severity": "LOW",
+      "number": 10,
+      "title": "Connect flow’s “friendly” error mapping is brittle; raw internal messages can leak through unchanged",
+      "file": "apps/web/src/features/matching/ConnectAppleMusic.tsx",
+      "lines": "29-37",
+      "category": "slop",
+      "description": "The “friendly” messaging depends on case-sensitive substring checks against an arbitrary error message string. Errors that don’t match these exact substrings pass through as raw messages.",
+      "code": "const friendly =\n  message.includes(\"cancel\") || message.includes(\"denied\")\n    ? \"You cancelled or denied access. Click below to try again.\"\n    : message.includes(\"revoked\") || message.includes(\"unauthorized\")\n      ? \"Apple Music access was revoked. Click below to connect again.\"\n      : message;\nsetError(friendly);",
+      "whyThisMatters": "Produces inconsistent user messaging and can surface technical/internal strings for common failure modes that don’t match these heuristics."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 11,
+      "title": "Create-playlist flow interprets “any MusicKit init error” as “needs auth”, delaying/obscuring real failures",
+      "file": "apps/web/src/features/playlist-export/CreatePlaylistView.tsx",
+      "lines": "42-48",
+      "category": "will-break",
+      "description": "This flow relies on `isMusicKitAuthorized()`. Because `isMusicKitAuthorized()` converts all initialization failures into `false`, this component will prompt for authorization even when the underlying failure is configuration/script/token/network-related.",
+      "code": "const authorized = await isMusicKitAuthorized();\nif (!authorized) {\n  setNeedsAuth(true);\n  setLoading(false);\n  return;\n}",
+      "whyThisMatters": "The UI can guide users into an authorization loop rather than reflecting the actual failure mode."
+    },
+    {
+      "severity": "HIGH",
+      "number": 12,
+      "title": "setlist.fm fetch path does not catch network-level `fetch()` failures; structured error return can be bypassed",
+      "file": "apps/api/src/lib/setlistfm.ts",
+      "lines": "92-97",
+      "category": "will-break",
+      "description": "`fetchSetlistFromApi()` calls `fetch()` without a surrounding try/catch. Network failures (DNS, connection errors, timeouts surfaced as rejected promises) will throw and skip returning a `FetchSetlistResult`, causing unexpected exceptions upstream.",
+      "code": "for (let attempt = 0; attempt <= MAX_RETRIES_429; attempt++) {\n  const res = await fetch(url, { headers });\n  lastStatus = res.status;\n  ...\n}",
+      "whyThisMatters": "Callers expecting `{ ok: false, status, message }` can instead receive an unhandled exception, leading to generic 500s and loss of intended error semantics."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 13,
+      "title": "Upstream error bodies are propagated (as text) into client-visible error messages",
+      "file": "apps/api/src/lib/setlistfm.ts",
+      "lines": "111-117, 135-139",
+      "category": "will-break",
+      "description": "For non-OK responses, the code reads `res.text()` and uses it (or parsed JSON `message`) as `lastMessage`, which is returned to higher layers. This can include HTML or opaque upstream/internal text. While later layers truncate, the content can still be user-visible and inconsistent.",
+      "code": "const text = await res.text();\ntry {\n  const json = JSON.parse(text) as { message?: string };\n  lastMessage = json.message ?? (text || res.statusText);\n} catch {\n  lastMessage = text || res.statusText;\n}\n\n...\n\nreturn {\n  ok: false,\n  status: lastStatus,\n  message: lastMessage || `setlist.fm returned ${lastStatus}`,\n};",
+      "whyThisMatters": "User-facing error strings can become upstream response fragments rather than stable, user-appropriate messages."
+    },
+    {
+      "severity": "HIGH",
+      "number": 14,
+      "title": "Proxy handler does not guard against library throws; unexpected rejections can propagate to API layer",
+      "file": "apps/api/src/routes/setlist/proxy.ts",
+      "lines": "30-31",
+      "category": "will-break",
+      "description": "`handleSetlistProxy()` awaits `fetchSetlistFromApi()` without try/catch. If `fetchSetlistFromApi()` throws (e.g., network-level fetch rejection), this function can throw instead of returning the declared `ProxyResponse` union.",
+      "code": "const result = await fetchSetlistFromApi(setlistId, apiKey);",
+      "whyThisMatters": "Breaks the function’s “always returns { body/status } or { error/status }” contract under real-world network failure conditions."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 15,
+      "title": "Dev-token minting swallows signing failures and returns a generic error with no local diagnostic output",
+      "file": "apps/api/src/routes/apple/dev-token.ts",
+      "lines": "20-29",
+      "category": "will-break",
+      "description": "If JWT signing fails, the error is fully swallowed and replaced with a generic message. This function itself does not emit any diagnostic info, so failures may be opaque depending on the runtime’s error logging.",
+      "code": "try {\n  const token = await signDeveloperToken({ teamId, keyId, privateKeyPem: privateKey });\n  return { token };\n} catch {\n  return { error: \"Token signing failed. Check server configuration and logs.\" };\n}",
+      "whyThisMatters": "Operational failures can become difficult to triage while still preventing core functionality (MusicKit authorization)."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 16,
+      "title": "Next.js API routes use bare catch-all handling with generic 500s; dev-token error responses also drop no-store headers",
+      "file": "apps/web/src/app/api/apple/dev-token/route.ts",
+      "lines": "10-23",
+      "category": "will-break",
+      "description": "The route wraps the call in a bare `catch {}` and returns a generic 500 error body with no diagnostics. Additionally, the success path sets `Cache-Control: no-store` and `Pragma: no-cache`, but the catch path omits them—creating inconsistent caching behavior between success and error responses.",
+      "code": "try {\n  const result = await handleDevToken();\n  const headers = corsHeaders(request) as Record<string, string>;\n  headers[\"Cache-Control\"] = \"no-store\";\n  headers[\"Pragma\"] = \"no-cache\";\n  return new Response(JSON.stringify(result), { status, headers });\n} catch {\n  const headers = corsHeaders(request) as Record<string, string>;\n  return new Response(JSON.stringify({ error: \"An unexpected error occurred. Please try again.\" }), {\n    status: 500,\n    headers,\n  });\n}",
+      "whyThisMatters": "When failures occur, clients receive minimal information and intermediaries may treat error responses differently than success responses due to missing cache controls."
+    }
+  ],
   "auditId": "10-error-handling",
   "sourceFile": "10-error-handling.md"
 }

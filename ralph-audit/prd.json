@@ -1,7 +1,7 @@
 {
   "project": "Setlist to Playlist – Deep Code Audit",
   "branchName": "main",
-  "description": "Read-only audit. Document broken logic, unfinished features, code slop, dead ends, stubs, and things that will break. No fixes. Output: ralph-audit/audit/*.md",
+  "description": "Read-only audit. Document broken logic, unfinished features, code slop, dead ends, stubs, and things that will break. No fixes. Output: ralph-audit/audit/*.md. Note: Codebase has had Deep Code Inspection fixes applied (DCI-001 through DCI-062 documented in docs/code-inspection-findings.md); re-running the audit reflects current state.",
   "verificationCommands": {
     "typecheck": "echo 'Audit mode - no verification'",
     "lint": "echo 'Audit mode - no verification'",

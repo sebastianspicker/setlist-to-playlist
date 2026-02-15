@@ -1,15 +1,148 @@
 {
-  "auditTitle": "App Pages & Layout Deep Audit",
-  "auditDate": "2026-02-14",
-  "filesExamined": 5,
-  "totalFindings": 8,
+  "auditTitle": "App Pages & Layout",
+  "auditDate": "2026-02-15T07:19:27Z",
+  "filesExamined": 4,
+  "totalFindings": 12,
   "summary": {
     "critical": 0,
     "high": 2,
-    "medium": 4,
-    "low": 2
+    "medium": 6,
+    "low": 4
   },
-  "findings": [],
+  "findings": [
+    {
+      "severity": "HIGH",
+      "number": 1,
+      "title": "Route error boundary displays raw `error.message` to users (information disclosure)",
+      "file": "apps/web/src/app/error.tsx",
+      "lines": "16-23",
+      "category": "will-break",
+      "description": "The route-level error UI renders `error.message` directly into the page. This can disclose internal implementation details (upstream error strings, internal route names, stack-adjacent messages, misconfiguration hints) to end users.",
+      "code": "const message = error instanceof Error ? error.message : String(error ?? \"Unknown error\");\n\n<p style={{ color: \"#666\", marginTop: \"0.5rem\" }}>\n  {message || \"An error occurred. You can try again.\"}\n</p>",
+      "whyThisMatters": "Error messages often contain internal details not intended for end users; displaying them increases the blast radius of otherwise recoverable failures."
+    },
+    {
+      "severity": "HIGH",
+      "number": 2,
+      "title": "Global error boundary displays raw `error.message` to users (information disclosure)",
+      "file": "apps/web/src/app/global-error.tsx",
+      "lines": "10-19",
+      "category": "will-break",
+      "description": "The global error UI also renders `error.message` directly. Global errors commonly come from root layout / framework-level failures, where messages are more likely to include internal details.",
+      "code": "const message = error instanceof Error ? error.message : String(error ?? \"Unknown error\");\n\n<p style={{ color: \"#666\", marginTop: \"0.5rem\" }}>\n  {message || \"An unexpected error occurred. You can try again.\"}\n</p>",
+      "whyThisMatters": "When the root crashes, users can see sensitive operational detail at the exact moment the app is least controlled."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 3,
+      "title": "Error-message extraction relies on `instanceof Error`, risking poor/incorrect user output",
+      "file": "apps/web/src/app/error.tsx",
+      "lines": "16-16",
+      "category": "will-break",
+      "description": "The UI assumes `error` is an `Error` instance at runtime and falls back to `String(error)` otherwise. If `error` is not a real `Error` instance (e.g., unusual serialization/transport cases or non-Error throws), `String(error)` can render as `\"[object Object]\"`, creating an unhelpful and confusing error display.",
+      "code": "const message = error instanceof Error ? error.message : String(error ?? \"Unknown error\");",
+      "whyThisMatters": "In the worst failure modes, the app’s last-resort UI can become uninformative (or misleading), reducing the chance users can recover."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 4,
+      "title": "Client-side logging of full error object can leak internals in production consoles",
+      "file": "apps/web/src/app/error.tsx",
+      "lines": "12-14",
+      "category": "will-break",
+      "description": "The route error boundary logs the full `error` object to the browser console for every error render. Depending on how errors are created/thrown, this can include stacks, nested causes, or other internal details.",
+      "code": "useEffect(() => {\n  console.error(error);\n}, [error]);",
+      "whyThisMatters": "Browser consoles are user-accessible; logging detailed errors increases inadvertent disclosure and can create noisy diagnostics in real user sessions."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 5,
+      "title": "Homepage copy promises a 4-step flow, but app-level wiring only renders the import feature",
+      "file": "apps/web/src/app/page.tsx",
+      "lines": "12-27",
+      "category": "unfinished",
+      "description": "The page presents an explicit “Import → Preview → Matching → Export” flow, but at the app-route level it only renders `SetlistImportView`. There is no top-level composition that visibly wires “matching” or “export” into the route. If those steps exist, they’re hidden behind (and coupled to) the import feature; if they don’t, the page copy is misleading.",
+      "code": "<ol style={{ marginTop: \"1.5rem\", paddingLeft: \"1.5rem\" }}>\n  <li><strong>Import</strong> – Enter setlist.fm URL or ID</li>\n  <li><strong>Preview</strong> – See artist, venue, date, and track list</li>\n  <li><strong>Matching</strong> – Confirm or correct Apple Music track matches</li>\n  <li><strong>Export</strong> – Create the playlist in Apple Music</li>\n</ol>\n<SetlistImportView />",
+      "whyThisMatters": "Mismatch between stated flow and route composition is a common source of user confusion and makes “where does matching/export live?” hard to reason about during maintenance."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 6,
+      "title": "No route-level loading boundary or explicit loading UI at the app-page/layout layer",
+      "file": "apps/web/src/app/page.tsx",
+      "lines": "3-28",
+      "category": "will-break",
+      "description": "The root route renders a feature component directly with no Suspense boundary or app-page-level loading UI. If the user experience depends on async work (fetching setlists, preparing preview state, initializing MusicKit authorization flows, etc.), the route-level UX can degrade into abrupt content jumps or “nothing happens” periods, depending on how nested components behave.",
+      "code": "export default function HomePage() {\n  return (\n    <main style={{ padding: \"2rem\", maxWidth: \"40rem\", margin: \"0 auto\", minWidth: 0 }}>\n      ...\n      <SetlistImportView />\n    </main>\n  );\n}",
+      "whyThisMatters": "Without a route-level loading experience, failures and latency tend to present as confusing UI stalls, especially on cold loads or slow networks."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 7,
+      "title": "Root layout unconditionally loads third-party MusicKit script with `beforeInteractive` (perf/availability risk; potential “layout flash”)",
+      "file": "apps/web/src/app/layout.tsx",
+      "lines": "22-27",
+      "category": "will-break",
+      "description": "The root layout loads MusicKit from Apple’s CDN on every page view and does so using `strategy=\"beforeInteractive\"`. This can increase the critical path (network dependency before interactivity) and makes core UX dependent on third-party script availability even when the current screen may not yet need MusicKit.",
+      "code": "<Script\n  src=\"https://js-cdn.music.apple.com/musickit/v3/musickit.js\"\n  strategy=\"beforeInteractive\"\n  crossOrigin=\"anonymous\"\n/>",
+      "whyThisMatters": "If the script is slow/blocked/unavailable, the app can feel broken (slow first load, delayed interactivity), and the user may perceive flicker/late initialization effects around MusicKit-dependent UI."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 8,
+      "title": "Global error UI bypasses root layout head/styles (unstyled/inconsistent crash experience)",
+      "file": "apps/web/src/app/global-error.tsx",
+      "lines": "13-34",
+      "category": "will-break",
+      "description": "The global error component returns its own `<html>`/`<body>` without any `<head>` content and without importing global CSS. This means that on a global crash, users will likely see a different (unstyled or partially styled) experience than the rest of the app, and layout-level metadata (theme-color meta, manifest link generation behavior, etc.) won’t apply consistently during the failure state.",
+      "code": "return (\n  <html lang=\"en\">\n    <body>\n      <main style={{ padding: \"2rem\", maxWidth: \"40rem\", margin: \"0 auto\", fontFamily: \"system-ui, sans-serif\" }}>\n        ...\n      </main>\n    </body>\n  </html>\n);",
+      "whyThisMatters": "Global failures are already high-friction; inconsistent styling/metadata makes recovery and user trust worse at the exact moment reliability is being tested."
+    },
+    {
+      "severity": "LOW",
+      "number": 9,
+      "title": "Root layout mixes `metadata` API with manual `<head>` markup (risk of drift/duplication)",
+      "file": "apps/web/src/app/layout.tsx",
+      "lines": "5-20",
+      "category": "slop",
+      "description": "The layout uses the `metadata` export (title/description/manifest) but also manually injects `<head>` with a theme-color meta tag. This split increases the risk that head concerns drift over time (e.g., some head tags managed in `metadata`, others manually), and can lead to duplication if theme/viewport metadata is later added via Next’s metadata APIs.",
+      "code": "export const metadata: Metadata = {\n  title: \"Setlist to Playlist\",\n  description: \"Import a setlist from setlist.fm and create an Apple Music playlist.\",\n  manifest: \"/manifest.webmanifest\",\n};\n\n<html lang=\"en\">\n  <head>\n    <meta name=\"theme-color\" content=\"#1a1a1a\" />\n  </head>",
+      "whyThisMatters": "Head management is a cross-cutting concern; splitting patterns at the root increases maintenance risk and makes regressions more likely."
+    },
+    {
+      "severity": "LOW",
+      "number": 10,
+      "title": "Error boundary types include `digest` but the UI ignores it entirely (reduced diagnosability)",
+      "file": "apps/web/src/app/error.tsx",
+      "lines": "9-10",
+      "category": "unfinished",
+      "description": "The `error` type includes an optional `digest`, but the component neither displays it nor uses it for correlation. This appears to be an unused capability and can make debugging production-only failures harder.",
+      "code": "error: Error & { digest?: string };",
+      "whyThisMatters": "When errors are intermittent, having a stable identifier (when available) can be important for triage and support workflows."
+    },
+    {
+      "severity": "LOW",
+      "number": 11,
+      "title": "Extensive inline styling in the root page suggests placeholder/prototype-level presentation",
+      "file": "apps/web/src/app/page.tsx",
+      "lines": "5-26",
+      "category": "stub",
+      "description": "The main page UI is primarily styled via inline style objects (layout sizing, spacing, list indentation). This looks like scaffolding/prototype UI rather than a cohesive layout system, and makes consistent theming and reuse harder.",
+      "code": "<main style={{ padding: \"2rem\", maxWidth: \"40rem\", margin: \"0 auto\", minWidth: 0 }}>\n...\n<ol style={{ marginTop: \"1.5rem\", paddingLeft: \"1.5rem\" }}>",
+      "whyThisMatters": "Inline styles tend to accrete and diverge across pages, which increases UI inconsistency and makes global changes harder."
+    },
+    {
+      "severity": "LOW",
+      "number": 12,
+      "title": "Minor UI slop in global error reset handler (unnecessary wrapper)",
+      "file": "apps/web/src/app/global-error.tsx",
+      "lines": "20-23",
+      "category": "slop",
+      "description": "The reset handler is wrapped in an arrow function even though `reset` already matches the expected callback signature.",
+      "code": "<button\n  type=\"button\"\n  onClick={() => reset()}\n>",
+      "whyThisMatters": "Minor, but it’s a sign of inconsistent patterns and adds small avoidable noise in the most critical fallback UI."
+    }
+  ],
   "auditId": "08-app-pages-layout",
   "sourceFile": "08-app-pages-layout.md"
 }

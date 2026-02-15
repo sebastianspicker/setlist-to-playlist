@@ -1,25 +1,168 @@
 {
   "auditTitle": "Lib & Utils Deep Audit",
-  "auditDate": "2026-02-14T12:42:13+01:00",
-  "filesExamined": 20,
-  "totalFindings": 18,
+  "auditDate": "2026-02-15",
+  "filesExamined": 11,
+  "totalFindings": 14,
   "summary": {
-    "critical": 3,
-    "high": 3,
+    "critical": 2,
+    "high": 4,
     "medium": 4,
-    "low": 8
+    "low": 4
   },
   "findings": [
     {
       "severity": "CRITICAL",
       "number": 1,
-      "title": "Localhost CORS allowlist check is prefix-based and spoofable",
+      "title": "Localhost CORS allowlist is bypassable via `startsWith(\"http://localhost\")`",
       "file": "apps/web/src/lib/cors.ts",
-      "lines": "7-17",
+      "lines": "8-18",
+      "category": "broken-logic",
+      "description": "When `ALLOWED_ORIGIN` is unset, `getAllowOrigin()` treats any `Origin` beginning with `http://localhost` or `http://127.0.0.1` as local. This can match attacker-controlled origins like `http://localhost.evil.com` (string prefix match), potentially enabling cross-origin reads of sensitive responses (e.g., Apple Developer Token endpoint, setlist proxy responses) in misconfigured deployments.",
+      "code": "const isLocalOrigin =\n  origin &&\n  (origin.startsWith(\"http://localhost\") || origin.startsWith(\"http://127.0.0.1\"));\n...\nreturn isLocalOrigin ? origin : null;",
+      "whyThisMatters": "This is a credential/privileged-data exposure risk if `ALLOWED_ORIGIN` is not set correctly in production or staging, and it weakens the intended “localhost-only” safety boundary."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 2,
+      "title": "CORS headers omit `Vary: Origin` despite origin-dependent responses",
+      "file": "apps/web/src/lib/cors.ts",
+      "lines": "20-28",
       "category": "will-break",
-      "description": "`getAllowOrigin()` treats any Origin string that *starts with* `http://localhost` or `http://127.0.0.1` as a “local origin”. This can be bypassed by attacker-controlled origins like `http://localhost.evil.com` (or similar prefix tricks), causing `Access-Control-Allow-Origin` to be returned for an unintended origin whenever `ALLOWED_ORIGIN` is unset (or when `configured.split(\",\")[0]` is empty and fallback logic applies).",
-      "code": null,
-      "whyThisMatters": ""
+      "description": "`corsHeaders()` conditionally sets `Access-Control-Allow-Origin` based on the request `Origin`, but does not emit `Vary: Origin`. If any caching layer is introduced (CDN/proxy/browser intermediate caches), responses for one origin can be reused for another, leading to confusing and potentially unsafe behavior.",
+      "code": "const headers: HeadersInit = { \"Content-Type\": contentType };\nif (allowOrigin) {\n  (headers as Record<string, string>)[\"Access-Control-Allow-Origin\"] = allowOrigin;\n}\nreturn headers;",
+      "whyThisMatters": "Origin-varying CORS responses without `Vary: Origin` can cause intermittent, environment-specific failures and policy mismatches."
+    },
+    {
+      "severity": "CRITICAL",
+      "number": 3,
+      "title": "MusicKit API usage likely incorrect (`music.music.api` vs documented `music.api.*`)",
+      "file": "apps/web/src/lib/musickit.ts",
+      "lines": "27-35, 172-203, 210-268",
+      "category": "will-break",
+      "description": "This module models the MusicKit instance as having a `music` property containing an `api()` function, and calls `music.music.api(...)` for catalog search and library playlist operations. Apple’s MusicKit web examples use `music.api...` methods on the instance (not `music.music...`). Additionally, widely used TypeScript definitions for MusicKit model the instance with an `api` property (and many API methods), not a nested `music.api` function. This mismatch strongly suggests runtime `TypeError` risks (e.g., `music.music` being `undefined`) and broken core flows (search, playlist creation, add-tracks). ([js-cdn.music.apple.com](https://js-cdn.music.apple.com/musickit/v1/index.html))",
+      "code": "const data = (await music.music.api(path)) as { ... };\n\nconst res = (await music.music.api(path, {\n  method: \"POST\",\n  data: body,\n})) as { ... };\n\nconst res = (await music.music.api(path, { method: \"POST\", data })) as ...;",
+      "whyThisMatters": "If the MusicKit instance API surface differs as the external docs/types indicate, these calls will crash at runtime and block matching + playlist export entirely."
+    },
+    {
+      "severity": "HIGH",
+      "number": 4,
+      "title": "Library playlist creation request shape conflicts with Apple’s documented request object",
+      "file": "apps/web/src/lib/musickit.ts",
+      "lines": "218-225",
+      "category": "will-break",
+      "description": "`createLibraryPlaylist()` builds a request body wrapped in a JSON:API-like `{ data: [...] }` array. Apple’s documentation for `LibraryPlaylistCreationRequest` describes a top-level object with required `attributes` and optional `relationships` (no `data` wrapper). This discrepancy risks consistent 4xx failures when attempting to create playlists. ([developer.apple.com](https://developer.apple.com/documentation/applemusicapi/libraryplaylistcreationrequest?utm_source=openai))",
+      "code": "const body = {\n  data: [{ type: \"playlists\" as const, attributes: { name } }],\n};",
+      "whyThisMatters": "Playlist export depends on creation succeeding; a request-shape mismatch is a hard failure in a primary app path."
+    },
+    {
+      "severity": "HIGH",
+      "number": 5,
+      "title": "Developer token TTL caching conflicts with one-time MusicKit configuration (token refresh likely impossible)",
+      "file": "apps/web/src/lib/musickit.ts",
+      "lines": "43-70, 96-122",
+      "category": "will-break",
+      "description": "The module implements a developer token TTL cache (~55 minutes), but `initMusicKit()` memoizes `configuredInstance` and returns it forever without reconfiguration. If the configured developer token expires, the TTL cache cannot help because `initMusicKit()` never re-runs `MusicKit.configure()` once `configuredInstance` is set. Type definitions also commonly model `developerToken` as read-only on the instance, implying a refresh requires reconfiguration rather than mutation.",
+      "code": "const TOKEN_CACHE_TTL_MS = 55 * 60 * 1000;\nlet cachedToken: string | null = null;\nlet tokenExpiresAt = 0;\n\nlet configuredInstance: MusicKitInstance | null = null;\n\nexport async function initMusicKit(): Promise<MusicKitInstance> {\n  if (configuredInstance) return configuredInstance;\n  const token = await fetchDeveloperToken();\n  const MusicKit = await waitForMusicKit();\n  MusicKit.configure({ developerToken: token, ... });\n  configuredInstance = MusicKit.getInstance();\n  return configuredInstance;\n}",
+      "whyThisMatters": "This can produce time-based production breakage where Apple Music API calls start failing after a period of use, with no recovery path short of reload."
+    },
+    {
+      "severity": "HIGH",
+      "number": 6,
+      "title": "`searchCatalog()` cache key ignores `limit` and storefront",
+      "file": "apps/web/src/lib/musickit.ts",
+      "lines": "149-203",
+      "category": "broken-logic",
+      "description": "The search cache is keyed only by `term`. Calls with different `limit` values can return cached results from an earlier call with a different limit. The cache key also does not include `storefront`, so storefront changes can reuse results from a different storefront.",
+      "code": "const searchCache = new Map<string, { tracks: AppleMusicTrack[]; expires: number }>();\n\nexport async function searchCatalog(term: string, limit = 5): Promise<AppleMusicTrack[]> {\n  const entry = searchCache.get(term);\n  if (entry && Date.now() < entry.expires) return entry.tracks;\n  ...\n  searchCache.set(term, { tracks, expires: Date.now() + SEARCH_CACHE_TTL_MS });\n  return tracks;\n}",
+      "whyThisMatters": "Matching quality and UI behavior can become inconsistent and non-deterministic depending on call order."
+    },
+    {
+      "severity": "HIGH",
+      "number": 7,
+      "title": "`addTracksToLibraryPlaylist()` throws after doing a successful partial add",
+      "file": "apps/web/src/lib/musickit.ts",
+      "lines": "250-274",
+      "category": "broken-logic",
+      "description": "The function filters invalid IDs, performs the add-tracks request for `validIds`, and then throws if any IDs were dropped. This means the caller sees an error even though tracks were added, encouraging retry flows that can create duplicates or unclear state.",
+      "code": "const validIds = songIds.filter((id) => typeof id === \"string\" && id.trim().length > 0);\n...\nconst res = (await music.music.api(path, { method: \"POST\", data })) as ...;\n...\nif (validIds.length < songIds.length) {\n  const dropped = songIds.length - validIds.length;\n  throw new Error(`${dropped} of ${songIds.length} IDs were invalid and skipped; ${validIds.length} tracks added.`);\n}",
+      "whyThisMatters": "This can convert a recoverable validation issue into a user-visible “failure” that is hard to reason about and may worsen outcomes on retry."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 8,
+      "title": "`playlistId` is validated with `.trim()` but used untrimmed in the request path",
+      "file": "apps/web/src/lib/musickit.ts",
+      "lines": "247-261",
+      "category": "broken-logic",
+      "description": "The function checks `playlistId?.trim()` for validity, but builds the request URL with the original `playlistId` string. If upstream passes whitespace-padded IDs, the request path becomes invalid.",
+      "code": "if (!playlistId?.trim()) {\n  throw new Error(\"Invalid playlist ID\");\n}\n...\nconst path = `/v1/me/library/playlists/${playlistId}/tracks`;",
+      "whyThisMatters": "Whitespace bugs become hard failures that are easy to introduce through UI state or pasted IDs."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 9,
+      "title": "`waitForMusicKit()` leaves a timeout running after resolve (dangling timer + late reject)",
+      "file": "apps/web/src/lib/musickit.ts",
+      "lines": "73-93",
+      "category": "slop",
+      "description": "When `window.MusicKit` becomes available, the interval is cleared and the promise resolves, but the 10-second timeout is not cleared. That timeout later fires and calls `reject()` even though the promise already resolved.",
+      "code": "const check = setInterval(() => {\n  if (window.MusicKit) {\n    clearInterval(check);\n    resolve(window.MusicKit);\n  }\n}, 50);\n\nsetTimeout(() => {\n  clearInterval(check);\n  reject(new Error(\"MusicKit script did not load\"));\n}, 10000);",
+      "whyThisMatters": "This creates avoidable timers and complicates debugging (late “did not load” paths can still execute)."
+    },
+    {
+      "severity": "MEDIUM",
+      "number": 10,
+      "title": "`setlistProxyUrl()` encourages malformed query construction",
+      "file": "apps/web/src/lib/api.ts",
+      "lines": "21-23",
+      "category": "will-break",
+      "description": "`setlistProxyUrl(query?: string)` appends `?${query}` verbatim. Callers must remember to (1) omit the leading `?` and (2) pre-encode values. Passing a query that already includes `?` results in `??...`, and passing unencoded content can break the URL.",
+      "code": "export const setlistProxyUrl = (query?: string) =>\n  apiUrl(\"/setlist/proxy\") + (query ? `?${query}` : \"\");",
+      "whyThisMatters": "URL construction bugs tend to show up as environment-specific failures and are easy to introduce in future call sites."
+    },
+    {
+      "severity": "LOW",
+      "number": 11,
+      "title": "`api.ts` comment suggests `API_PATH` may be empty, but it is hardcoded to `\"/api\"`",
+      "file": "apps/web/src/lib/api.ts",
+      "lines": "3-7",
+      "category": "slop",
+      "description": "The docstring implies `API_PATH` could be empty depending on configuration, but the constant is always `\"/api\"`. This mismatch can mislead future changes around API base URL behavior.",
+      "code": "/**\n * Base path for API routes (same app: /api, or empty when using API_BASE_URL with trailing path).\n */\nconst API_PATH = \"/api\";",
+      "whyThisMatters": "Stale comments cause configuration mistakes and incorrect assumptions during refactors."
+    },
+    {
+      "severity": "LOW",
+      "number": 12,
+      "title": "Unused exports in `apps/web/src/lib/*`",
+      "file": "apps/web/src/lib/api.ts",
+      "lines": "24",
+      "category": "dead-end",
+      "description": "`healthUrl()` is exported but appears unused within the repo, increasing surface area and maintenance cost.",
+      "code": "export const healthUrl = () => apiUrl(\"/health\");",
+      "whyThisMatters": "Unused exports accumulate and make it harder to know what is actually supported/relied on."
+    },
+    {
+      "severity": "LOW",
+      "number": 13,
+      "title": "Unused exports in `apps/web/src/lib/musickit.ts`",
+      "file": "apps/web/src/lib/musickit.ts",
+      "lines": "53-70, 124-128",
+      "category": "dead-end",
+      "description": "- `fetchDeveloperToken()` is exported but only used internally by `initMusicKit()` in this repo.\n- `getMusicKitInstance()` is exported but unused.",
+      "code": "export async function fetchDeveloperToken(): Promise<string> { ... }\n\nexport function getMusicKitInstance(): MusicKitInstance {\n  if (!configuredInstance) throw new Error(\"MusicKit not configured. Call initMusicKit() first.\");\n  return configuredInstance;\n}",
+      "whyThisMatters": "This increases API surface area without corresponding usage, and can lock in accidental contracts."
+    },
+    {
+      "severity": "LOW",
+      "number": 14,
+      "title": "`@repo/shared` utilities appear unused by apps (dead-end package); entrypoint exports are not covered by tests",
+      "file": "packages/shared/src/utils/constants.ts",
+      "lines": "1",
+      "category": "dead-end",
+      "description": "`SETLIST_FM_BASE_URL` is exported but only referenced by the package’s own example test; no app/package in the monorepo appears to import it. Similar applies to `API_ERROR` / `ApiErrorCode`. This suggests `@repo/shared` may be dead weight or at risk of drifting from real usage.",
+      "code": "export const SETLIST_FM_BASE_URL = 'https://api.setlist.fm/rest/1.0';",
+      "whyThisMatters": "Unused shared utilities tend to diverge from reality and create confusion about the “source of truth.”"
     }
   ],
   "auditId": "13-lib-utils",

@@ -1,83 +1,78 @@
 # Core Package – Setlist & Matching Findings
 
-Audit Date: 2026-02-14T00:00:00Z  
+Audit Date: 2026-02-15T06:52:32Z  
 Files Examined: 8  
-Total Findings: 13  
+Total Findings: 20  
 
 ## Summary by Severity
-- Critical: 0
+- Critical: 1
 - High: 4
-- Medium: 5
-- Low: 4
+- Medium: 9
+- Low: 6
 
 ---
 
 ## Findings
 
-### [HIGH] Finding #1: `mapSetlistFmToSetlist` only reads `raw.set` and silently drops set data when the API returns a `sets` wrapper
+### CRITICAL Finding #1: `mapSetlistFmToSetlist` only reads `raw.set` and can silently drop all songs when the API returns a `sets` wrapper
 
 **File:** `packages/core/src/setlist/mapper.ts`  
-**Lines:** 20-35  
-**Category:** will-break  
+**Lines:** 20-22  
+**Category:** broken-logic
 
 **Description:**
-The mapper only attempts to read sets via `raw.set` and treats anything else as “no sets”. setlist.fm’s published JSON model documents a top-level `set` array, but the setlist.fm API forum documents a known discrepancy where responses can include a `sets` object containing the `set` array. In that scenario, this mapper returns `sets: []` without error, making imports appear successful while yielding zero tracks.
+The mapper only considers `raw.set` when building `sets`. Real-world setlist.fm API responses are reported to sometimes return set data under `sets: { set: [...] }` (wrapper object) instead of a top-level `set` array. In that case, `Array.isArray(raw.set)` is false, `fmSets` becomes `[]`, and the function returns a `Setlist` with `sets: []` without throwing. This is especially risky because call sites cast `unknown` JSON to `SetlistFmResponse`, so TypeScript does not protect against this shape mismatch.
 
 **Code:**
-```typescript
+```ts
 const sets: SetlistEntry[][] = [];
 const fmSets = Array.isArray(raw.set) ? raw.set : [];
-
-for (const fmSet of fmSets) {
-  if (!fmSet || typeof fmSet !== "object") continue;
-  const songs = Array.isArray(fmSet.song) ? fmSet.song : [];
-  // ...
-}
 ```
 
 **Why this matters:**
-A setlist import can “succeed” but produce an empty tracklist, breaking the core flow (preview/matching/export) and making debugging difficult because no error is surfaced.
+This can produce “successful” imports that contain zero tracks, cascading into empty previews/matching flows and making failures hard to diagnose.
 
 ---
 
-### [HIGH] Finding #2: Mapper “validates” `raw.artist` is an object but does not validate `artist.name` (or other fields) are strings, allowing invalid domain data
+### HIGH Finding #2: Mapper validation is too shallow; key fields can be missing or non-strings and still propagate into the domain model
 
 **File:** `packages/core/src/setlist/mapper.ts`  
-**Lines:** 10-19  
-**Category:** will-break  
+**Lines:** 9-18, 37-43  
+**Category:** will-break
 
 **Description:**
-The function checks `raw` and `raw.artist` are objects, but never validates `raw.artist.name` is a string. Because call sites can cast unknown JSON into `SetlistFmResponse`, runtime values can violate the TypeScript interfaces. If `raw.artist.name` is missing, empty, or a non-string, the function returns a `Setlist` with an empty or non-string `artist`, which then propagates into UI labels and Apple Music search queries.
+The function checks that `raw` is an object and that `raw.artist` is an object, but it never validates that `raw.artist.name` is a string (or even present). Because callers can cast arbitrary JSON to `SetlistFmResponse`, `raw.artist?.name ?? ""` can evaluate to a non-string (e.g., number/object) and still be assigned to `artist` in the returned `Setlist`. Similarly, `raw.id ?? ""` can propagate non-string `id` values.
 
 **Code:**
-```typescript
-if (!raw || typeof raw !== "object") {
-  throw new Error("Invalid setlist response");
-}
+```ts
 if (!raw.artist || typeof raw.artist !== "object") {
   throw new Error("Invalid setlist response: missing artist");
 }
 const artistName = raw.artist?.name ?? "";
+
+return {
+  id: raw.id ?? "",
+  artist: artistName,
+  // ...
+};
 ```
 
 **Why this matters:**
-Downstream code assumes `setlist.artist` is meaningful. Invalid/empty artist names can degrade matching quality and can present confusing UX (“Setlist: ”).
+Downstream UI and matching logic assume `artist`/`id` are valid strings; malformed values can create confusing labels, broken search queries, and hard-to-trace runtime errors.
 
 ---
 
-### [HIGH] Finding #3: Song filtering/type-guard is too weak; `SetlistEntry.name` can become non-string and empty-string entries are preserved
+### HIGH Finding #3: Song item “type guard” only checks for a `name` key, not that `name` is a non-empty string
 
 **File:** `packages/core/src/setlist/mapper.ts`  
 **Lines:** 25-33  
-**Category:** broken-logic  
+**Category:** broken-logic
 
 **Description:**
-The filter only checks that the song value is an object and that `"name" in s`, but does not validate that `s.name` is a string. As a result:
-- If `name` exists but is non-string (number/object), it passes the filter and is assigned to `SetlistEntry.name` via `s.name ?? ""` (non-nullish non-string values survive).
-- If `name` is missing/undefined, the code coerces it to `""` and still includes the entry.
+The filter predicate treats any object containing a `name` property as a `SetlistFmSong`, even if `name` is `null`, a number, or an empty string. The mapper then builds entries using `s.name ?? ""`, which allows empty/invalid track names into the `Setlist`. Those invalid names can later normalize to `""`, causing artist-only or empty search queries.
 
 **Code:**
-```typescript
+```ts
 const entries: SetlistEntry[] = songs
   .filter((s): s is SetlistFmSong => s != null && typeof s === "object" && "name" in s)
   .map((s) => ({
@@ -88,127 +83,111 @@ const entries: SetlistEntry[] = songs
 ```
 
 **Why this matters:**
-Invalid track names can lead to bad rendering (“” track rows) and can generate overly broad Apple Music searches (including artist-only queries), producing incorrect suggested matches.
+A single malformed song entry can degrade matching quality significantly (including generating empty queries), and the UI may render blank track rows.
 
 ---
 
-### [HIGH] Finding #4: `normalizeTrackName` “feat/ft” regexes are missing word boundaries, so they can match inside unrelated words and corrupt titles
+### MEDIUM Finding #4: Implementation contradicts “preserves set structure” comment by dropping empty sets entirely
 
-**File:** `packages/core/src/matching/normalize.ts`  
-**Lines:** 8-14  
-**Category:** broken-logic  
+**File:** `packages/core/src/setlist/mapper.ts`  
+**Lines:** 4-8, 34  
+**Category:** slop
 
 **Description:**
-The `feat`/`ft` regexes begin with `\s*`, which can match zero characters, and do not require a word boundary before `feat`/`ft`. This allows matches starting inside other words (e.g., substrings like `...feat...` / `...ft...`), and then strips subsequent characters due to `[^-]+...`.
+The doc comment claims “Preserves set structure and order”, but the implementation skips any set that maps to zero entries (`if (entries.length > 0) sets.push(entries)`). This changes the set structure by removing empty sets (including sets that might exist only for metadata like encore markers or set names).
 
 **Code:**
-```typescript
-.replace(/\s*feat\.?\s*[^-]+(?:-\s*[^-]+)*/gi, "")
-.replace(/\s*ft\.?\s*[^-]+(?:-\s*[^-]+)*/gi, "")
+```ts
+* Preserves set structure and order; each song becomes a SetlistEntry.
+
+if (entries.length > 0) sets.push(entries);
 ```
 
 **Why this matters:**
-Track normalization can mangle legitimate titles, producing poor search queries and significantly increasing the chance of wrong matches.
+Consumers that rely on set boundaries (or want to display them faithfully) can’t distinguish “empty set present” from “set missing,” and the UI can drift from the source setlist.
 
 ---
 
-### [MEDIUM] Finding #5: `normalizeTrackName` comment and implementation disagree; the “match until next ' - '” behavior is not what the regex does
+### MEDIUM Finding #5: Mapper discards set/song metadata (encore/set name/cover/with/tape), reducing fidelity and potentially harming matching
 
-**File:** `packages/core/src/matching/normalize.ts`  
-**Lines:** 8-13  
-**Category:** slop  
+**File:** `packages/core/src/setlist/mapper.ts`  
+**Lines:** 25-33  
+**Category:** broken-logic
 
 **Description:**
-The inline comment claims the `feat/ft` segment is matched “until next ` - ` or end”, but the regex actually stops at any literal hyphen (`-`) (not specifically ` - `), and does not treat en-dash/em-dash consistently during the `feat/ft` removal step (those are handled later by the whitespace/hyphen normalization). This makes the actual removal behavior sensitive to punctuation choices and can under/over-strip.
+The mapper only outputs `name`, `artist`, and `info`, ignoring known setlist.fm fields such as `SetlistFmSet.name`, `SetlistFmSet.encore`, and song fields like `tape`, `with`, and `cover`. Some of these fields can materially affect whether an entry is a real “song” to match (e.g., tape/intro) or can help disambiguate search.
 
 **Code:**
-```typescript
-// ... match until next " - " or end
-.replace(/\s*feat\.?\s*[^-]+(?:-\s*[^-]+)*/gi, "")
+```ts
+.map((s) => ({
+  name: s.name ?? "",
+  artist: artistName || undefined,
+  info: s.info ?? undefined,
+}));
 ```
 
 **Why this matters:**
-Misleading comments make future changes risky, and inconsistent stripping leads to unstable search behavior across real-world title formats.
+This can lead to matching/playlist entries that include non-song items and reduces the app’s ability to explain or correct ambiguous matches.
 
 ---
 
-### [MEDIUM] Finding #6: Parenthetical stripping is unconditional and removes canonical title content (not only metadata)
-
-**File:** `packages/core/src/matching/normalize.ts`  
-**Lines:** 10-10  
-**Category:** broken-logic  
-
-**Description:**
-The normalization removes all parenthetical segments anywhere in the string, not just trailing metadata like “(live)” or “(acoustic)”. Many legitimate titles contain parentheses as part of the official name; removing them changes the search term materially.
-
-**Code:**
-```typescript
-.replace(/\s*\([^)]*\)\s*/g, " ") // (live), (acoustic), etc.
-```
-
-**Why this matters:**
-Over-stripping can reduce match accuracy or cause the “best” match to be the wrong song (especially when multiple songs share the remaining token(s)).
-
----
-
-### [MEDIUM] Finding #7: `buildSearchQuery` length cap is per-part, not total; combined query can exceed `MAX_QUERY_LENGTH` and the cap is a magic number
-
-**File:** `packages/core/src/matching/search-query.ts`  
-**Lines:** 3-15  
-**Category:** slop  
-
-**Description:**
-`MAX_QUERY_LENGTH` is applied independently to track and artist, so the final query can be roughly `200 + 1 + 200` characters (plus normalization effects). If the intent is to prevent total query length from exceeding API limits, this does not enforce it. The constant is also a “magic number” without a referenced limit.
-
-**Code:**
-```typescript
-const MAX_QUERY_LENGTH = 200;
-
-const track = normalizeTrackName(trackName).slice(0, MAX_QUERY_LENGTH);
-const artist = (artistName?.trim() ?? "").slice(0, MAX_QUERY_LENGTH);
-const parts = [track, artist].filter(Boolean);
-return parts.join(" ").replace(/\s+/g, " ").trim();
-```
-
-**Why this matters:**
-Long inputs can still produce long queries and trigger upstream request failures or truncation behavior that is hard to reason about.
-
----
-
-### [MEDIUM] Finding #8: `buildSearchQuery` can return artist-only queries, enabling “random” auto-suggestions when track normalizes to empty
-
-**File:** `packages/core/src/matching/search-query.ts`  
-**Lines:** 10-14  
-**Category:** will-break  
-
-**Description:**
-When `normalizeTrackName(trackName)` returns `""` (e.g., empty track name, or a name that is fully stripped), `buildSearchQuery` returns only the artist name. In the matching flow, an artist-only catalog search can return arbitrary popular tracks by that artist, and the first result can be incorrectly suggested as the match.
-
-**Code:**
-```typescript
-const parts = [track, artist].filter(Boolean);
-return parts.join(" ").replace(/\s+/g, " ").trim();
-```
-
-**Why this matters:**
-Incorrect default matches create bad playlists unless the user manually audits every row, undermining trust in the “suggestions” step.
-
----
-
-### [MEDIUM] Finding #9: `setlistfm-types` is incomplete and can be out-of-sync with both the docs and reported real responses (missing `lastUpdated`, missing `sets` wrapper, `cover/with` are `unknown`)
+### HIGH Finding #6: `SetlistFmResponse` type cannot represent the reported `sets: { set: [...] }` wrapper shape
 
 **File:** `packages/core/src/setlist/setlistfm-types.ts`  
-**Lines:** 1-44  
-**Category:** will-break  
+**Lines:** 34-42  
+**Category:** will-break
 
 **Description:**
-Problems in the setlist.fm type modeling:
-- `SetlistFmResponse` omits documented fields like `lastUpdated`, increasing the odds that consumers cast/ignore fields and drift from reality.
-- The types only represent a top-level `set?: SetlistFmSet[]`, but the setlist.fm forum reports a known discrepancy where responses can include `sets: { set: [...] }`.
-- `SetlistFmSong.cover` and `SetlistFmSong.with` are typed as `unknown`, even though the docs model them as structured artist-like objects. This reduces type safety and discourages proper runtime checks.
+The core type models set data only as `set?: SetlistFmSet[]`. Community reports indicate that real setlist.fm API responses can return sets under a wrapper object (e.g., `sets: { set: [...] }`). With the current type, that shape is unrepresentable, encouraging unsafe casts and making it easy for the mapper to “succeed” but return zero songs.
 
 **Code:**
-```typescript
+```ts
+export interface SetlistFmResponse {
+  // ...
+  set?: SetlistFmSet[];
+  // ...
+}
+```
+
+**Why this matters:**
+This creates a false sense of type safety at the exact boundary the app relies on for song extraction.
+
+---
+
+### MEDIUM Finding #7: Type/runtime contract mismatch: `SetlistFmSet.song` is required in the type but treated as optional/unknown in implementation
+
+**File:** `packages/core/src/setlist/setlistfm-types.ts`  
+**Lines:** 28-32  
+**Category:** slop
+
+**Description:**
+`SetlistFmSet.song` is declared as a required `SetlistFmSong[]`, but the mapper treats `fmSet.song` as potentially missing/malformed (guards with `Array.isArray(fmSet.song)`). This indicates the interface does not reflect the runtime contract the code is written against.
+
+**Code:**
+```ts
+export interface SetlistFmSet {
+  name?: string;
+  encore?: number;
+  song: SetlistFmSong[];
+}
+```
+
+**Why this matters:**
+Consumers of the type may incorrectly assume `song` is always present/valid, while the implementation is already compensating for invalid shapes.
+
+---
+
+### MEDIUM Finding #8: `SetlistFmSong.cover` and `SetlistFmSong.with` are typed as `unknown` despite being structured in docs
+
+**File:** `packages/core/src/setlist/setlistfm-types.ts`  
+**Lines:** 20-26  
+**Category:** slop
+
+**Description:**
+The types model `cover` and `with` as `unknown`, even though setlist.fm documentation models them as structured objects (artist-like). This removes useful type information and encourages downstream code to ignore these fields entirely.
+
+**Code:**
+```ts
 export interface SetlistFmSong {
   name: string;
   info?: string;
@@ -216,99 +195,237 @@ export interface SetlistFmSong {
   with?: unknown;
   tape?: boolean;
 }
+```
 
-export interface SetlistFmResponse {
-  id: string;
-  versionId?: string;
-  eventDate: string;
-  artist: SetlistFmArtist;
-  venue?: SetlistFmVenue;
-  tour?: { name?: string };
-  set?: SetlistFmSet[];
-  info?: string;
+**Why this matters:**
+Loss of structure reduces the ability to disambiguate songs (covers/guest performers) and can lead to unsafe casting when someone eventually uses these fields.
+
+---
+
+### LOW Finding #9: `SetlistFmArtist` / `SetlistFmVenue` are partial vs docs; drift risk despite the “API response” framing
+
+**File:** `packages/core/src/setlist/setlistfm-types.ts`  
+**Lines:** 1-18  
+**Category:** slop
+
+**Description:**
+These interfaces omit multiple documented fields (e.g., artist disambiguation; venue/city/country details). The file comment frames them as “Types for the setlist.fm REST API response,” which can be read as more complete/authoritative than they are (even with “subset used by the app”).
+
+**Code:**
+```ts
+export interface SetlistFmArtist {
+  name: string;
+  mbid?: string;
+  sortName?: string;
   url?: string;
 }
 ```
 
 **Why this matters:**
-Type drift increases the chance that production data doesn’t match compile-time assumptions, leading to silent data loss (missing sets) or runtime oddities when values don’t conform.
+Partial API modeling increases the risk of mismatched expectations and future incorrect assumptions at the setlist.fm boundary.
 
 ---
 
-### [LOW] Finding #10: `normalizeTrackName` docstring claims “extra punctuation” stripping, but implementation mostly preserves punctuation (except hyphens/dashes)
+### MEDIUM Finding #10: `normalizeTrackName` removes all parentheticals anywhere, including canonical title text
 
 **File:** `packages/core/src/matching/normalize.ts`  
-**Lines:** 1-16  
-**Category:** slop  
+**Lines:** 10-12  
+**Category:** broken-logic
 
 **Description:**
-The comment claims punctuation is stripped, but the implementation does not remove most punctuation characters (e.g., `!`, `.`, `,`, `'`, `:`). The only “punctuation-ish” normalization is collapsing hyphen/dash characters into spaces.
+The first replace removes any `(...)` substring anywhere in the title. Many canonical song titles contain meaningful parentheticals (not just live/acoustic/feat markers). Removing them can change the title substantially and increase false positives in catalog search.
 
 **Code:**
-```typescript
-/**
- * Normalize track name for search: strip "feat.", "live", extra punctuation, parentheticals.
- */
-  // ...
-  .replace(/[\s\-–—]+/g, " ")
+```ts
+.replace(/\s*\([^)]*\)\s*/g, " ") // (live), (acoustic), etc.
 ```
 
 **Why this matters:**
-Comments are used as “intent”; when they diverge from behavior, callers may overestimate normalization strength and rely on it for cases it does not handle.
+Over-stripping can lead to searching for the wrong title, especially for songs where parentheticals are part of the official name.
 
 ---
 
-### [LOW] Finding #11: `Setlist.eventDate` comment is ambiguous (“ISO or display”), but imported data is a fixed `dd-MM-yyyy` string per setlist.fm docs
+### MEDIUM Finding #11: Parenthetical stripping regex does not handle nested parentheses and can leave malformed remnants
 
-**File:** `packages/core/src/setlist/types.ts`  
-**Lines:** 17-18  
-**Category:** slop  
+**File:** `packages/core/src/matching/normalize.ts`  
+**Lines:** 11-12  
+**Category:** will-break
 
 **Description:**
-The type comment suggests `eventDate` could be ISO, but the mapped setlist.fm field is documented as `dd-MM-yyyy`. This can cause downstream assumptions (sorting, formatting, parsing) to be wrong or inconsistent if a caller treats it as ISO.
+The regex `\([^)]*\)` cannot correctly handle nested parentheses (it stops at the first `)`), potentially leaving stray `)` characters or partially stripping content. The follow-up “unbalanced trailing parens” rule only addresses an opening `(` without a closing `)` at the end of the string, not nested/mid-string artifacts.
 
 **Code:**
-```typescript
-/** Event date (ISO or display) */
-eventDate?: string;
+```ts
+.replace(/\s*\([^)]*\)\s*/g, " ")
+.replace(/\s*\([^)]*$/g, " ")
 ```
 
 **Why this matters:**
-Date strings that look structured but aren’t ISO frequently lead to subtle bugs (lexicographic sorts, locale parsing differences, invalid `Date` parsing in JS).
+Malformed normalization output can reduce search quality and create confusing queries that don’t match catalog titles.
 
 ---
 
-### [LOW] Finding #12: `AppleTrack` / `MatchResult` types are exported but unused anywhere in the repo (dead-end surface area)
+### MEDIUM Finding #12: “- live” stripping only recognizes hyphen-minus, not en dash/em dash variants
+
+**File:** `packages/core/src/matching/normalize.ts`  
+**Lines:** 13, 16  
+**Category:** broken-logic
+
+**Description:**
+The code strips only `- live` with a literal hyphen-minus. If a setlist track uses `– Live` or `— Live` (common typography), it won’t be stripped. The later normalization collapses dashes into spaces, leaving an extra `Live` token in the query.
+
+**Code:**
+```ts
+.replace(/\s*-\s*live\s*$/i, "")
+.replace(/[\s\-–—]+/g, " ")
+```
+
+**Why this matters:**
+Live versions are a primary normalization target; failing to strip common dash variants undermines the stated intent and can skew results.
+
+---
+
+### LOW Finding #13: Comment claims “strip extra punctuation,” but implementation largely only normalizes whitespace/dashes
+
+**File:** `packages/core/src/matching/normalize.ts`  
+**Lines:** 1-4, 16  
+**Category:** slop
+
+**Description:**
+The function comment describes stripping “extra punctuation,” but the code does not remove punctuation such as `! ? . , / : ' "`. Aside from collapsing hyphen/dash runs into spaces, punctuation remains in the returned string.
+
+**Code:**
+```ts
+* Normalize track name for search: strip "feat.", "live", extra punctuation, parentheticals.
+
+.replace(/[\s\-–—]+/g, " ")
+```
+
+**Why this matters:**
+Mismatch between comment and behavior can mislead callers and reviewers, and punctuation can materially affect search terms depending on the API’s tokenization.
+
+---
+
+### HIGH Finding #14: `buildSearchQuery` can return artist-only queries when the track normalizes to empty
+
+**File:** `packages/core/src/matching/search-query.ts`  
+**Lines:** 10-14  
+**Category:** will-break
+
+**Description:**
+If `normalizeTrackName(trackName)` returns `""` (empty input, fully stripped titles, or invalid `name` values leaking from the mapper), the returned query becomes just the artist name. In catalog search flows, an artist-only query can return arbitrary popular tracks by that artist, increasing the chance of incorrect “top result” matches.
+
+**Code:**
+```ts
+const track = normalizeTrackName(trackName).slice(0, MAX_QUERY_LENGTH);
+const artist = (artistName?.trim() ?? "").slice(0, MAX_QUERY_LENGTH);
+const parts = [track, artist].filter(Boolean);
+return parts.join(" ").replace(/\s+/g, " ").trim();
+```
+
+**Why this matters:**
+This can produce systematically wrong suggestions that still look plausible to users (same artist, wrong song).
+
+---
+
+### MEDIUM Finding #15: Query length capping is not applied to the final query, despite the stated intent
+
+**File:** `packages/core/src/matching/search-query.ts`  
+**Lines:** 3-5, 10-14  
+**Category:** broken-logic
+
+**Description:**
+`MAX_QUERY_LENGTH` is applied independently to `track` and `artist`, but the final query can still exceed the limit once joined (up to ~401 chars plus normalization). This contradicts the comment that the length is capped to avoid very long queries hitting API limits.
+
+**Code:**
+```ts
+/** DCI-051: Cap length to avoid very long queries hitting API limits. */
+const MAX_QUERY_LENGTH = 200;
+
+const track = normalizeTrackName(trackName).slice(0, MAX_QUERY_LENGTH);
+const artist = (artistName?.trim() ?? "").slice(0, MAX_QUERY_LENGTH);
+```
+
+**Why this matters:**
+If upstream search endpoints enforce term-length limits, the cap may not prevent failures in worst-case inputs.
+
+---
+
+### MEDIUM Finding #16: `buildSearchQuery` can return an empty string when both inputs are empty/stripped
+
+**File:** `packages/core/src/matching/search-query.ts`  
+**Lines:** 10-14  
+**Category:** will-break
+
+**Description:**
+When both `track` and `artist` are empty after trimming/normalization, `parts` becomes empty and the function returns `""`. There is no guard here; callers can pass an empty term to a search API, which commonly results in errors or broad/unexpected results.
+
+**Code:**
+```ts
+const parts = [track, artist].filter(Boolean);
+return parts.join(" ").replace(/\s+/g, " ").trim();
+```
+
+**Why this matters:**
+Empty queries are a common edge case in user-driven flows and in the presence of malformed upstream data (e.g., blank song names).
+
+---
+
+### LOW Finding #17: `AppleTrack` / `MatchResult` appear unused in the repo, and `MatchResult.setlistEntry` duplicates shape while dropping fields
 
 **File:** `packages/core/src/matching/types.ts`  
 **Lines:** 1-12  
-**Category:** dead-end  
+**Category:** dead-end
 
 **Description:**
-`AppleTrack` and `MatchResult` are defined and re-exported, but there are no imports/usages in the repository. This is a maintenance burden and can mislead readers into thinking there is core matching logic that produces/consumes `MatchResult` objects when there is not.
+Repo-wide usage (excluding audit artifacts/docs) shows no imports of `AppleTrack` or `MatchResult`. Additionally, `MatchResult.setlistEntry` redefines a `{ name; artist? }` shape instead of referencing `SetlistEntry`, dropping `info` and risking divergence if the domain model evolves.
 
 **Code:**
-```typescript
-export interface AppleTrack { /* ... */ }
-export interface MatchResult { /* ... */ }
+```ts
+export interface MatchResult {
+  /** Original setlist entry */
+  setlistEntry: { name: string; artist?: string };
+  /** Matched Apple Music track, or null if no match */
+  appleTrack: AppleTrack | null;
+}
 ```
 
 **Why this matters:**
-Unused exported types expand the public API of `@repo/core` without corresponding implementation or adoption, increasing the cost of future refactors.
+Unused exported types add maintenance surface area, and duplicated shapes tend to drift subtly over time.
 
 ---
 
-### [LOW] Finding #13: `SetlistFmArtist` / `SetlistFmVenue` / `SetlistFmSong` / `SetlistFmSet` are re-exported but unused in the repo
+### LOW Finding #18: `normalizeTrackName` is exported from the package barrel but has no non-test consumers
+
+**File:** `packages/core/src/matching/index.ts`  
+**Lines:** 1-3  
+**Category:** dead-end
+
+**Description:**
+Within the repo (excluding tests), matching flows use `buildSearchQuery`, not `normalizeTrackName` directly. Exporting `normalizeTrackName` increases public API surface area without a demonstrated consumer in production code.
+
+**Code:**
+```ts
+export { normalizeTrackName } from "./normalize.js";
+export { buildSearchQuery } from "./search-query.js";
+```
+
+**Why this matters:**
+Broader public surface area increases the cost of changing normalization semantics later, even if the export is effectively unused.
+
+---
+
+### LOW Finding #19: `SetlistFmArtist` / `SetlistFmVenue` / `SetlistFmSong` / `SetlistFmSet` are re-exported but unused in production code
 
 **File:** `packages/core/src/setlist/index.ts`  
 **Lines:** 2-8  
-**Category:** dead-end  
+**Category:** dead-end
 
 **Description:**
-The setlist package index re-exports multiple setlist.fm API types, but repo usage appears to only depend on `SetlistFmResponse`. This creates additional public surface area and implies stability/accuracy requirements for types that are not actively consumed or validated.
+Repo-wide usage (excluding audit artifacts/docs) shows only `SetlistFmResponse` imported outside `packages/core`; the other setlist.fm type exports are not consumed. This expands the public API for types that are partial and already drifting vs the real API.
 
 **Code:**
-```typescript
+```ts
 export type {
   SetlistFmResponse,
   SetlistFmArtist,
@@ -319,14 +436,30 @@ export type {
 ```
 
 **Why this matters:**
-Exporting more API-facing types than needed increases the blast radius of type drift (especially given the known doc/response discrepancies for sets).
+Unused exports raise the chance of external dependence on incomplete/stale types, making future refactors harder.
+
+---
+
+### LOW Finding #20: `Setlist.eventDate` contract is ambiguous vs setlist.fm’s `eventDate` format
+
+**File:** `packages/core/src/setlist/types.ts`  
+**Lines:** 17-18  
+**Category:** slop
+
+**Description:**
+`Setlist.eventDate` is optional and documented as “ISO or display,” but the mapper assigns `raw.eventDate` directly and setlist.fm documents `eventDate` as `dd-MM-yyyy`. This creates ambiguity for downstream consumers (e.g., playlist naming/formatting) and weakens guarantees about date parsing/formatting expectations.
+
+**Code:**
+```ts
+/** Event date (ISO or display) */
+eventDate?: string;
+```
+
+**Why this matters:**
+Ambiguous date formats commonly lead to inconsistent UI output and subtle bugs when formatting or sorting by date.
 
 ---
 
 ## External References
-
-- https://api.setlist.fm/docs/1.0/json_Setlist.html (accessed 2026-02-14)  
-- https://api.setlist.fm/docs/1.0/json_Set.html (accessed 2026-02-14)  
-- https://www.setlist.fm/forum/setlistfm/setlistfm-api/bug-on-the-documentation-63d706bf (accessed 2026-02-14)  
-- https://www.setlist.fm/forum/setlistfm/setlistfm-api/inconsistent-sets-object-in-api-response-for-get-10artistmbidsetlists-23d700e3 (accessed 2026-02-14)  
-- https://www.setlist.fm/forum/setlistfm/setlistfm-api/possible-bug-with-swagger-definition-6bd77efa (accessed 2026-02-14)
+- setlist.fm REST API docs — Setlist JSON (accessed 2026-02-15): https://api.setlist.fm/docs/1.0/json_Setlist.html  
+- setlist.fm forum thread reporting `sets: { set: [...] }` wrapper returned by the API (accessed 2026-02-15): https://www.setlist.fm/forum/setlistfm-api-6/the-rest-api-returns-setsset-instead-of-set-7bd6aaec

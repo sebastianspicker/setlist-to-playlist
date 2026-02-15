@@ -1,148 +1,15 @@
 {
   "auditTitle": "Setlist Import UI Deep Audit",
-  "auditDate": "2026-02-14",
+  "auditDate": "2026-02-15",
   "filesExamined": 5,
-  "totalFindings": 12,
+  "totalFindings": 16,
   "summary": {
     "critical": 0,
-    "high": 3,
-    "medium": 4,
-    "low": 5
+    "high": 2,
+    "medium": 7,
+    "low": 7
   },
-  "findings": [
-    {
-      "severity": "HIGH",
-      "number": 1,
-      "title": "“Ignore stale responses” logic breaks when re-requesting the same input (abort + same `trimmed` value)",
-      "file": "apps/web/src/features/setlist-import/SetlistImportView.tsx",
-      "lines": "34-75",
-      "category": "broken-logic",
-      "description": "The “latest request” guard uses the request payload string (`trimmed`) as the identity token (`currentRequestRef.current = trimmed`). If the user triggers another request with the *same* trimmed value (double-submit, clicking “Try again” while still loading, etc.), the earlier request can be aborted and will hit the `catch` early-return, but its `finally` still runs. Because `currentRequestRef.current === trimmed` is still true (the new request stored the same string), the aborted request’s `finally` clears `loading` and sets `currentRequestRef.current = null`, which can cause the newer in-flight request to be ignored when it returns (`currentRequestRef.current !== trimmed`).",
-      "code": "currentRequestRef.current = trimmed;\nsetLoading(true);\ntry {\n  const res = await fetch(url, { signal });\n  const data = (await res.json()) as { error?: string } | SetlistFmResponse;\n\n  if (currentRequestRef.current !== trimmed) return;\n  // ...\n} catch (err) {\n  if ((err as { name?: string })?.name === \"AbortError\") return;\n  if (currentRequestRef.current !== trimmed) return;\n  // ...\n} finally {\n  if (currentRequestRef.current === trimmed) {\n    setLoading(false);\n    currentRequestRef.current = null;\n  }\n}",
-      "whyThisMatters": "Users can get stuck in a state where loading stops early, and the successful response of the most recent request is discarded. This directly undermines the component’s stated intent (DCI-042) and can break the import flow under common “double action” behavior."
-    },
-    {
-      "severity": "HIGH",
-      "number": 2,
-      "title": "New fetch does not clear previous preview; “Continue” remains clickable during loading, enabling wrong-step/wrong-setlist transitions",
-      "file": "apps/web/src/features/setlist-import/SetlistImportView.tsx",
-      "lines": "34-75, 201-218",
-      "category": "will-break",
-      "description": "When starting `loadSetlist`, the code sets `loading` but does not clear the currently displayed `setlist` or disable downstream navigation controls. If the user is on the preview step and submits a new input, the old preview remains visible while the new request is in-flight. The “Continue to Matching” button is also still rendered and enabled (it’s not gated by `loading`), allowing the user to proceed using stale data. When the fetch eventually completes, it unconditionally sets `setStep(\"preview\")`, potentially yanking the user back from matching to preview.",
-      "code": "setLoading(true);\n// does NOT clear setlist or step here\n\nconst mapped = mapSetlistFmToSetlist(data as SetlistFmResponse);\nsetSetlist(mapped);\nsetStep(\"preview\");",
-      "whyThisMatters": "This enables mismatched UI state (preview/matching/export not corresponding to the user’s most recent import intent). It can also cause confusing “teleporting” between steps when a late response forces `preview`."
-    },
-    {
-      "severity": "HIGH",
-      "number": 3,
-      "title": "Response handling assumes JSON and an object shape; can throw or produce opaque errors on non-object JSON / non-JSON responses",
-      "file": "apps/web/src/features/setlist-import/SetlistImportView.tsx",
-      "lines": "49-69",
-      "category": "will-break",
-      "description": "The code always calls `res.json()` without checking content-type or guarding empty/non-JSON responses. Additionally, it uses `\"error\" in data` which assumes `data` is an object (the `in` operator throws on `null`, and can also be problematic on primitives). If the proxy returns non-JSON (HTML error page, plain text) or JSON that isn’t an object, the import flow can fail with confusing messages (e.g., JSON parse errors or `Cannot use 'in' operator...`) rather than a clear user-facing error.",
-      "code": "const data = (await res.json()) as { error?: string } | SetlistFmResponse;\n\nif (!res.ok || \"error\" in data) {\n  const message =\n    (data as { error?: string }).error ?? `Request failed (${res.status})`;\n  setError(message);\n  setSetlist(null);\n  return;\n}",
-      "whyThisMatters": "Network/proxy failures are a primary failure mode for an import flow. Opaque parse/type errors degrade UX and make support/debugging harder."
-    },
-    {
-      "severity": "MEDIUM",
-      "number": 4,
-      "title": "No unmount cleanup for in-flight requests (AbortController exists but is not used for component teardown)",
-      "file": "apps/web/src/features/setlist-import/SetlistImportView.tsx",
-      "lines": "28-45",
-      "category": "will-break",
-      "description": "The component maintains an `AbortController` and aborts when starting a new request, but there is no unmount cleanup to abort an in-flight request when the component unmounts (navigation, hot reload, parent conditional render). A late-resolving request may still attempt to update state in `try/catch/finally`.",
-      "code": "const abortControllerRef = useRef<AbortController | null>(null);\n\nabortControllerRef.current?.abort();\nabortControllerRef.current = new AbortController();\nconst signal = abortControllerRef.current.signal;",
-      "whyThisMatters": "This can cause wasted network work and late state updates after unmount (at best no-ops, at worst noisy dev warnings or unexpected UI flicker if remounted)."
-    },
-    {
-      "severity": "MEDIUM",
-      "number": 5,
-      "title": "Input validation is largely “non-empty + max length”; no format/domain checks despite UI claiming “URL or ID”",
-      "file": "apps/web/src/features/setlist-import/SetlistImportView.tsx",
-      "lines": "78-82, 126-165",
-      "category": "will-break",
-      "description": "The submit handler only checks `trimmed` is non-empty and below `MAX_INPUT_LENGTH`. There is no validation that an entered “ID” resembles a setlist ID, nor that a URL is plausibly a setlist.fm URL. This pushes avoidable invalid inputs into the network/proxy layer and yields less actionable error messaging.",
-      "code": "const trimmed = inputValue.trim();\nif (trimmed) loadSetlist(trimmed);",
-      "whyThisMatters": "Users can enter arbitrary strings and get backend/proxy errors that don’t help them correct the input, increasing retries and perceived flakiness."
-    },
-    {
-      "severity": "MEDIUM",
-      "number": 6,
-      "title": "MAX_INPUT_LENGTH check uses raw input length, not actual encoded URL length",
-      "file": "apps/web/src/features/setlist-import/SetlistImportView.tsx",
-      "lines": "31-40, 48",
-      "category": "will-break",
-      "description": "The code checks `trimmed.length` against `MAX_INPUT_LENGTH`, but the request is a GET with a query string that includes `encodeURIComponent(trimmed)`. Encoding can increase the length, meaning an input that passes the check may still produce an overly long URL.",
-      "code": "const MAX_INPUT_LENGTH = 2000;\n\nconst url = setlistProxyUrl(`id=${encodeURIComponent(trimmed)}`);",
-      "whyThisMatters": "If the goal is to prevent URL-length issues (DCI-010), checking the pre-encoded string may not reliably prevent failures for inputs containing many escapable characters."
-    },
-    {
-      "severity": "MEDIUM",
-      "number": 7,
-      "title": "Error messaging and accessibility signaling are conflated (network/proxy errors mark the input invalid)",
-      "file": "apps/web/src/features/setlist-import/SetlistImportView.tsx",
-      "lines": "54-59, 141-143, 173-199",
-      "category": "will-break",
-      "description": "`aria-invalid={!!error}` flags the input as invalid for all errors, including network/proxy/server failures that are not necessarily “input invalid”. The displayed message is either backend-provided `error` or a generic `Request failed (status)`, without context like “could not reach server” vs “not found” vs “invalid URL”.",
-      "code": "aria-invalid={!!error}\naria-describedby={error ? \"setlist-error\" : undefined}",
-      "whyThisMatters": "This can confuse users and assistive tech: a transient backend failure is announced as an invalid form field, and the message may not guide recovery."
-    },
-    {
-      "severity": "LOW",
-      "number": 8,
-      "title": "Preview can include blank track rows and misleading track counts",
-      "file": "apps/web/src/features/setlist-import/SetlistPreview.tsx",
-      "lines": "8-16, 41-58",
-      "category": "will-break",
-      "description": "`getAllTracks` pushes entries with `name: entry?.name ?? \"\"`. If entries are missing names or contain empty strings, the preview will render blank list items and count them in `Tracks ({tracks.length})`, which can look broken.",
-      "code": "for (const entry of set) {\n  tracks.push({ name: entry?.name ?? \"\", info: entry?.info });\n}",
-      "whyThisMatters": "A preview step should build confidence before matching/export; blank items reduce trust and can misrepresent how many tracks will be processed."
-    },
-    {
-      "severity": "LOW",
-      "number": 9,
-      "title": "Uses array index as React key in track list",
-      "file": "apps/web/src/features/setlist-import/SetlistPreview.tsx",
-      "lines": "51-58",
-      "category": "slop",
-      "description": "The preview list uses `key={i}`. If the track array changes due to filtering, insertion, or mapping adjustments, React may reuse DOM nodes in ways that momentarily display mismatched track content.",
-      "code": "{tracks.map((t, i) => (\n  <li key={i} style={{ marginBottom: \"0.25rem\" }}>",
-      "whyThisMatters": "It’s a common source of subtle UI bugs, and it conflicts with the audit focus on key correctness when names repeat (this avoids duplicates but trades for stability issues)."
-    },
-    {
-      "severity": "LOW",
-      "number": 10,
-      "title": "`setlistProxyUrl` takes a raw query string, making callers responsible for correct `?`/encoding behavior",
-      "file": "apps/web/src/lib/api.ts",
-      "lines": "22-23",
-      "category": "slop",
-      "description": "`setlistProxyUrl` concatenates `?${query}` without guarding whether `query` already includes `?` or whether it is properly encoded. The current caller encodes correctly, but the helper is a footgun for future use.",
-      "code": "export const setlistProxyUrl = (query?: string) =>\n  apiUrl(\"/setlist/proxy\") + (query ? `?${query}` : \"\");",
-      "whyThisMatters": "Small URL builder inconsistencies tend to accumulate and become hard-to-debug request failures."
-    },
-    {
-      "severity": "LOW",
-      "number": 11,
-      "title": "`APPLE_MUSIC_APP_ID` is not trimmed/validated; whitespace values silently pass through",
-      "file": "apps/web/src/lib/config.ts",
-      "lines": "18-20",
-      "category": "will-break",
-      "description": "Unlike `NEXT_PUBLIC_API_URL`, the Apple Music app ID is not trimmed and defaults to `\"\"` with no validation. A misconfigured env value like `\"  \"` will be treated as a present string but still invalid for downstream usage.",
-      "code": "export const APPLE_MUSIC_APP_ID =\n  process.env.NEXT_PUBLIC_APPLE_MUSIC_APP_ID ?? \"\";",
-      "whyThisMatters": "Misconfiguration becomes harder to diagnose when invalid values are accepted without normalization."
-    },
-    {
-      "severity": "LOW",
-      "number": 12,
-      "title": "Barrel export includes `SetlistPreview`, but internal usage bypasses the barrel (inconsistent import surface)",
-      "file": "apps/web/src/features/setlist-import/index.ts",
-      "lines": "1-2",
-      "category": "slop",
-      "description": "`index.ts` re-exports `SetlistPreview`, but `SetlistImportView` imports it directly from `./SetlistPreview`. This creates an inconsistent module surface and increases the chance of duplicate import styles or circular dependency issues as the feature grows.",
-      "code": "export { SetlistImportView } from \"./SetlistImportView\";\nexport { SetlistPreview } from \"./SetlistPreview\";",
-      "whyThisMatters": "Inconsistent import patterns add friction and can produce subtle bundling/refactor issues over time, especially in feature-sliced codebases."
-    }
-  ],
+  "findings": [],
   "auditId": "05-setlist-import-ui",
   "sourceFile": "05-setlist-import-ui.md"
 }

@@ -1,57 +1,96 @@
-# Apple Developer Token & JWT Findings
+# Apple Developer Token & JWT Deep Audit Findings
 
-Audit Date: 2026-02-14T10:16:05Z  
-Files Examined: 13  
-Total Findings: 12
+Audit Date: 2026-02-15T06:39:08Z  
+Files Examined: 10  
+Total Findings: 13
 
 ## Summary by Severity
 - Critical: 0
-- High: 3
-- Medium: 7
-- Low: 2
+- High: 4
+- Medium: 6
+- Low: 3
 
 ---
 
 ## Findings
 
-### [HIGH] Finding #1: Developer Token response lacks explicit anti-caching headers (token may be cached/shared)
+### HIGH Finding #1: JWT omits Apple-recommended `origin` claim (web hardening)
 
-**File:** `apps/web/src/app/api/apple/dev-token/route.ts`  
-**Lines:** 5-15  
+**File:** `apps/api/src/lib/jwt.ts`  
+**Lines:** 32-37  
 **Category:** will-break
 
 **Description:**
-The Developer Token endpoint returns a bearer credential but does not set any explicit response caching directives (e.g. `Cache-Control: no-store`) and does not set `Vary: Origin`. In environments with intermediate caches (CDN/proxy) or client-side caching behaviors, this increases the risk that a signed Developer Token is cached longer than intended and/or served across request contexts.
+Apple’s Apple Music API / MusicKit guidance encourages adding an `origin` claim for web applications so the token is only valid for requests whose `Origin` header matches an allowed site origin. This implementation signs an empty payload (`new SignJWT({})`) and sets only standard claims (`iss`, `iat`, `exp`) plus header (`alg`, `kid`). As a result, minted Developer Tokens are not constrained to an allowed website at Apple’s validation layer, increasing risk that a token obtained from this endpoint can be replayed by unauthorized web origins.
 
-This is amplified by the fact that the route relies on `corsHeaders(request)` which only sets `Content-Type` and conditionally `Access-Control-Allow-Origin`, with no cache-related headers.
+**Code:**
+```ts
+const jwt = await new SignJWT({})
+  .setProtectedHeader({ alg: "ES256", kid: keyId })
+  .setIssuer(teamId)
+  .setIssuedAt()
+  .setExpirationTime(Math.floor(Date.now() / 1000) + TOKEN_VALIDITY_SECONDS)
+  .sign(keyObject);
+```
+
+**Why this matters:**
+Without `origin` constraint, a stolen/replayed Developer Token can be used from any origin (until expiry), which undermines a key web-specific protection Apple promotes for reducing token abuse.
+
+---
+
+### HIGH Finding #2: No rate limiting on Developer Token issuance (explicitly documented as missing)
+
+**File:** `apps/web/src/app/api/apple/dev-token/route.ts`  
+**Lines:** 9-16  
+**Category:** will-break
+
+**Description:**
+The dev-token route mints a new Developer Token on every GET request with no throttling, per-IP limiting, per-origin limiting, or other abuse controls. Project documentation explicitly notes that rate limiting is not implemented yet.
+
+**Code:**
+```ts
+const result = await handleDevToken();
+const status = "error" in result ? 503 : 200;
+...
+return new Response(JSON.stringify(result), { status, headers });
+```
+
+**Why this matters:**
+An attacker can generate sustained signing load (crypto + key parsing) and create operational cost/instability (DoS vector), and can mass-issue tokens for reuse elsewhere.
+
+---
+
+### HIGH Finding #3: Endpoint mints Developer Tokens for any unauthenticated caller; CORS is not an access-control boundary
+
+**File:** `apps/web/src/app/api/apple/dev-token/route.ts`  
+**Lines:** 9-16  
+**Category:** will-break
+
+**Description:**
+There is no authentication/authorization check in the route handler; it returns `{ token }` to any caller that can reach the endpoint. Even with strict `Access-Control-Allow-Origin`, CORS only governs whether a browser allows JavaScript to read the response. Non-browser clients (server-to-server, curl, bots) can fetch the token regardless of `Origin` and regardless of whether `Access-Control-Allow-Origin` is set.
 
 **Code:**
 ```ts
 export async function GET(request: NextRequest) {
   const result = await handleDevToken();
-  const status = "error" in result ? 503 : 200;
-  return new Response(JSON.stringify(result), {
-    status,
-    headers: corsHeaders(request),
-  });
+  ...
+  return new Response(JSON.stringify(result), { status, headers });
 }
 ```
 
 **Why this matters:**
-A Developer Token is a credential. Accidental caching (especially shared caching) can widen token exposure and make abuse easier.
+If the intention is “only our app can obtain tokens,” relying on CORS alone does not enforce that. Tokens can be harvested directly from the public endpoint and replayed.
 
 ---
 
-### [HIGH] Finding #2: “Localhost” CORS detection is overly permissive (accepts non-local origins like `http://localhost.evil.com`)
+### HIGH Finding #4: Localhost CORS allowlist is vulnerable to origin-prefix spoofing (`startsWith`)
 
 **File:** `apps/web/src/lib/cors.ts`  
-**Lines:** 7-16  
-**Category:** will-break
+**Lines:** 10-17  
+**Category:** broken-logic
 
 **Description:**
-When `ALLOWED_ORIGIN` is unset, `getAllowOrigin()` treats any `Origin` header that *starts with* `http://localhost` or `http://127.0.0.1` as “local”. This matches attacker-controlled domains such as `http://localhost.evil.com` (a valid origin string) and will echo that origin back as allowed.
-
-The comment claims “only localhost/127.0.0.1 are allowed”, but the actual predicate is prefix-based and therefore broader than intended.
+When `ALLOWED_ORIGIN` is unset, `getAllowOrigin` treats any `Origin` that *starts with* `http://localhost` or `http://127.0.0.1` as local and therefore allowed. This can be bypassed by attacker-controlled origins like `http://localhost.evil.com` (or `http://127.0.0.1.evil.com`), which match the prefix check but are not loopback hosts.
 
 **Code:**
 ```ts
@@ -63,108 +102,93 @@ return isLocalOrigin ? origin : null;
 ```
 
 **Why this matters:**
-If `ALLOWED_ORIGIN` is missing in a deployed environment (or during development), a hostile webpage on a `localhost*.tld` origin can read the Developer Token response via browser JavaScript, increasing token leakage risk.
+In environments where `ALLOWED_ORIGIN` is missing (dev, preview, misconfigured prod), a malicious website with a crafted hostname can read the dev-token response from a victim’s browser if it can reach the endpoint.
 
 ---
 
-### [HIGH] Finding #3: Dev-token endpoint is unauthenticated and not rate-limited; CORS does not prevent non-browser extraction/abuse
-
-**File:** `docs/tech/apple-music.md`  
-**Lines:** 34-38  
-**Category:** will-break
-
-**Description:**
-The documentation explicitly states rate limiting is not implemented for the dev-token endpoint. The implementation also does not include any authentication, abuse controls, or rate limiting in the route handler path. CORS only influences whether browsers expose the response to JavaScript; it does not prevent direct HTTP clients (server-side scripts, bots) from calling the endpoint and receiving tokens.
-
-**Code:**
-```md
-- Developer Token must be generated server-side only. Restrict dev-token endpoint by origin and optionally rate-limit.
-- **Rate limiting:** Not implemented for the dev-token endpoint yet. Consider adding per-IP or per-origin limits ...
-```
-
-**Why this matters:**
-A publicly callable “mint token on demand” endpoint can be abused for token harvesting and downstream Apple API quota/rate consumption, and CORS alone does not meaningfully constrain non-browser callers.
-
----
-
-### [MEDIUM] Finding #4: `ALLOWED_ORIGIN` supports comma-separated values but silently uses only the first origin
+### MEDIUM Finding #5: `ALLOWED_ORIGIN` accepts dangerous/invalid values (e.g. `"*"`, values with paths) without validation
 
 **File:** `apps/web/src/lib/cors.ts`  
-**Lines:** 12-15  
+**Lines:** 9-16  
 **Category:** will-break
 
 **Description:**
-When `ALLOWED_ORIGIN` is set, the code splits on commas and uses only the first entry. This can be surprising for operators who expect multiple origins to work (staging + prod, multiple frontends). It also creates a misconfiguration footgun: the first origin in the list becomes the only one ever emitted.
+`getAllowOrigin` returns the configured value (first comma-separated entry) after trimming and stripping only a trailing `/`. It does not validate that the value is a valid origin (scheme + host + optional port) and does not prevent `"*"`.
 
 **Code:**
 ```ts
+const configured = (process.env.ALLOWED_ORIGIN ?? "").trim();
 if (configured) {
-  const single = configured.split(",")[0].trim();
+  const single = configured.split(",")[0].trim().replace(/\/$/, "");
   return single || (isLocalOrigin ? origin : null);
 }
 ```
 
 **Why this matters:**
-Misconfigured CORS often presents as “token endpoint broken” in production, and can lead to ad-hoc relaxations elsewhere or accidental exposure during troubleshooting.
+- Setting `ALLOWED_ORIGIN="*"` would cause API responses to include `Access-Control-Allow-Origin: *`, enabling any website to read the dev-token response from browsers (no credentialed requests are used here).
+- Setting `ALLOWED_ORIGIN` to a value with a path (e.g. `https://example.com/app`) produces an invalid/mismatched ACAO value and breaks legitimate browser access in subtle ways.
 
 ---
 
-### [MEDIUM] Finding #5: Preflight responses are incomplete (no `Access-Control-Allow-Methods` / `Access-Control-Allow-Headers` / `Vary`)
+### MEDIUM Finding #6: No `Vary: Origin` despite dynamically varying `Access-Control-Allow-Origin`
+
+**File:** `apps/web/src/lib/cors.ts`  
+**Lines:** 20-27  
+**Category:** will-break
+
+**Description:**
+When `ALLOWED_ORIGIN` is unset, `corsHeaders` echoes the request origin (for “local” origins). The response headers therefore vary by `Origin`, but no `Vary: Origin` header is added.
+
+**Code:**
+```ts
+const headers: HeadersInit = { "Content-Type": contentType };
+if (allowOrigin) {
+  (headers as Record<string, string>)["Access-Control-Allow-Origin"] = allowOrigin;
+}
+```
+
+**Why this matters:**
+Intermediary caches (or any caching layer not respecting application intent) can incorrectly reuse a response across origins, leading to confusing failures or, in worse configurations, unintended origin exposure patterns.
+
+---
+
+### MEDIUM Finding #7: Error-path response omits explicit `no-store`/`no-cache` headers
 
 **File:** `apps/web/src/app/api/apple/dev-token/route.ts`  
-**Lines:** 5-7  
+**Lines:** 17-23  
 **Category:** will-break
 
 **Description:**
-The `OPTIONS` handler returns `204` with `corsHeaders(request)`, which only sets `Content-Type` and maybe `Access-Control-Allow-Origin`. It does not return common preflight headers (`Access-Control-Allow-Methods`, `Access-Control-Allow-Headers`, `Access-Control-Max-Age`). While the current client path uses a simple `GET`, this is fragile and can break if the request becomes non-simple (custom headers, credentials mode changes, or future method changes).
+The success/error-result path explicitly disables caching via `Cache-Control: no-store` and `Pragma: no-cache`, but the outer catch block (unexpected exceptions) does not set these cache headers.
 
 **Code:**
 ```ts
-export async function OPTIONS(request: NextRequest) {
-  return new Response(null, { status: 204, headers: corsHeaders(request) });
-}
-```
-
-**Why this matters:**
-CORS failures can be intermittent and environment-specific, and are expensive to debug; the current implementation is minimal and easy to outgrow.
-
----
-
-### [MEDIUM] Finding #6: Signing failures are swallowed with no logging; error text implies logs exist
-
-**File:** `apps/api/src/routes/apple/dev-token.ts`  
-**Lines:** 20-32  
-**Category:** slop
-
-**Description:**
-`handleDevToken()` catches all errors during signing and returns a generic error message, but does not log the underlying exception. The returned message instructs operators to “Check server configuration and logs,” but this function itself does not emit any logs, so failures can become opaque unless the hosting platform logs unhandled errors elsewhere (these are handled here).
-
-**Code:**
-```ts
-try {
-  const token = await signDeveloperToken({ teamId, keyId, privateKeyPem: privateKey });
-  ...
-  return { token };
 } catch {
-  return { error: "Token signing failed. Check server configuration and logs." };
+  const headers = corsHeaders(request) as Record<string, string>;
+  return new Response(
+    JSON.stringify({ error: "An unexpected error occurred. Please try again." }),
+    { status: 500, headers }
+  );
 }
 ```
 
 **Why this matters:**
-Operational diagnosability is reduced: invalid PEM formatting, wrong key type, or runtime crypto issues all collapse to the same message with no local trace.
+Inconsistent cache headers can allow unexpected caching of failure responses by clients/proxies, complicating recovery and debugging (and increasing the chance of stale error behavior).
 
 ---
 
-### [MEDIUM] Finding #7: PEM normalization does not handle some common env encodings (e.g. literal `\\r\\n`), leading to hard-to-diagnose failures
+### MEDIUM Finding #8: PEM normalization is incomplete for common env encodings and quoting patterns
 
 **File:** `apps/api/src/lib/jwt.ts`  
-**Lines:** 22-30  
+**Lines:** 22-26  
 **Category:** will-break
 
 **Description:**
-Normalization replaces literal `\\n` sequences and real `\r\n` / `\r`. If an environment value uses Windows newlines encoded as literal `\\r\\n`, the `\\n` portion becomes a real newline but the `\\r` remains as a literal backslash + `r` character, which can corrupt the PEM and cause `createPrivateKey()` to throw.
+The code normalizes:
+- literal `\\n` → newline
+- actual CRLF / CR → newline
 
-There is also no explicit validation that the PEM contains the expected header/footer; malformed-but-non-empty values proceed to crypto parsing and then fail inside signing.
+It does **not** normalize other common escaped variants such as literal `\\r\\n` or literal `\\r`, and does not strip wrapping quotes that some env systems/UI copy-pastes include. These patterns can cause `createPrivateKey` to throw, resulting in token issuance failure.
 
 **Code:**
 ```ts
@@ -172,120 +196,130 @@ const normalizedPem = privateKeyPem
   .replace(/\\n/g, "\n")
   .replace(/\r\n/g, "\n")
   .replace(/\r/g, "\n");
-const keyObject = createPrivateKey({ key: normalizedPem, format: "pem" });
 ```
 
 **Why this matters:**
-A small configuration formatting difference can fully break token issuance, and the current error handling path makes root-cause identification difficult.
+This is a brittle configuration surface: token minting can fail depending on how `APPLE_PRIVATE_KEY` is stored/escaped by the deployment platform or `.env` tooling.
 
 ---
 
-### [LOW] Finding #8: Redundant/unreachable check for `token` after signing
+### MEDIUM Finding #9: Key parsing occurs on every request; combined with no rate limiting increases DoS risk
 
-**File:** `apps/api/src/routes/apple/dev-token.ts`  
-**Lines:** 26-28  
-**Category:** slop
+**File:** `apps/api/src/lib/jwt.ts`  
+**Lines:** 27-31  
+**Category:** will-break
 
 **Description:**
-After `await signDeveloperToken(...)`, the code checks `if (!token)` and returns an error. In practice, `signDeveloperToken()` either resolves to a non-empty string or throws; returning an empty string is not a meaningful expected state.
+`createPrivateKey` runs for every call to `signDeveloperToken`. There is no memoization/caching of the parsed `KeyObject`, so repeated token requests perform repeated key parsing and object creation.
 
 **Code:**
 ```ts
-if (!token) {
-  return { error: "Failed to sign developer token" };
+const keyObject = createPrivateKey({
+  key: normalizedPem,
+  format: "pem",
+});
+```
+
+**Why this matters:**
+Repeated crypto key parsing is unnecessary overhead and amplifies abuse potential when the endpoint is hammered (especially since there is also no rate limiting).
+
+---
+
+### MEDIUM Finding #10: `handleDevToken` suppresses error details without any logging, while message implies logs exist
+
+**File:** `apps/api/src/routes/apple/dev-token.ts`  
+**Lines:** 20-29  
+**Category:** slop
+
+**Description:**
+`handleDevToken` catches all exceptions and returns a generic error message, but does not log the underlying error. The returned message instructs operators to “Check server configuration and logs,” but this function does not emit logs and the immediate call sites also swallow errors.
+
+**Code:**
+```ts
+try {
+  const token = await signDeveloperToken({ teamId, keyId, privateKeyPem: privateKey });
+  return { token };
+} catch {
+  return { error: "Token signing failed. Check server configuration and logs." };
 }
 ```
 
 **Why this matters:**
-Minor, but it adds dead-path logic and makes it harder to reason about actual failure modes (throw vs. empty result).
+Operational diagnosis becomes significantly harder: configuration issues (bad PEM formatting, wrong key type, runtime incompatibility) become opaque outages.
 
 ---
 
-### [MEDIUM] Finding #9: Client token cache TTL is hard-coded and not derived from the JWT `exp` claim
+### LOW Finding #11: HTTP status code mapping collapses all functional errors to `503`
 
-**File:** `apps/web/src/lib/musickit.ts`  
-**Lines:** 43-70  
-**Category:** will-break
-
-**Description:**
-The client caches the Developer Token for a fixed 55 minutes, assuming the server token is valid for 1 hour. The cache does not parse the JWT `exp` claim. If the server’s token validity changes (shorter or longer), the client behavior can drift: it may continue using a token that is already expired, or it may refresh more often than necessary.
-
-**Code:**
-```ts
-const TOKEN_CACHE_TTL_MS = 55 * 60 * 1000; // 55 minutes
-...
-cachedToken = data.token;
-tokenExpiresAt = Date.now() + TOKEN_CACHE_TTL_MS;
-```
-
-**Why this matters:**
-Token validity mismatches manifest as sporadic MusicKit failures after an app has been open for some time, which is a poor UX and hard to diagnose.
-
----
-
-### [MEDIUM] Finding #10: Client token fetch uses default fetch caching semantics; combined with server headers, token responses may be stored in HTTP caches
-
-**File:** `apps/web/src/lib/musickit.ts`  
-**Lines:** 52-58  
-**Category:** will-break
-
-**Description:**
-`fetchDeveloperToken()` uses `fetch(devTokenUrl())` with default options. If the dev-token response is cacheable (explicitly or implicitly via intermediaries), the token can be persisted in browser/proxy caches outside the in-memory TTL model, potentially longer than intended.
-
-**Code:**
-```ts
-cachedToken = null;
-tokenExpiresAt = 0;
-const res = await fetch(devTokenUrl());
-```
-
-**Why this matters:**
-Even if the app intends to keep the token ephemeral (memory-only), HTTP caching layers can undermine that assumption.
-
----
-
-### [MEDIUM] Finding #11: Test suite references a private key fixture file in-repo (private key material present in repository)
-
-**File:** `apps/api/tests/dev-token.test.ts`  
-**Lines:** 6-9, 35-39  
-**Category:** will-break
-
-**Description:**
-The tests rely on a PEM private key fixture at `tests/fixtures/apple-test-key.pem`. Even if this key is intended purely for testing, it is still private key material stored in the repo, which increases the risk of accidental reuse, security scanning alerts, and policy violations (“no secrets”) depending on organizational standards.
-
-**Code:**
-```ts
-const FIXTURE_KEY_PATH = join(process.cwd(), "tests/fixtures/apple-test-key.pem");
-...
-process.env.APPLE_PRIVATE_KEY = readFileSync(FIXTURE_KEY_PATH, "utf8");
-```
-
-**Why this matters:**
-Private key material in-repo tends to spread (copied into other contexts) and can be mistakenly treated as acceptable precedent for handling real signing keys.
-
----
-
-### [LOW] Finding #12: Documentation mismatches can mislead operators about CORS behavior and current implementation state
-
-**File:** `docs/exec-plans/completed/002-api-dev-token.md`  
-**Lines:** 10-13  
+**File:** `apps/web/src/app/api/apple/dev-token/route.ts`  
+**Lines:** 11-13  
 **Category:** slop
 
 **Description:**
-The completed plan states that in dev the route allows request origin when “localhost/https,” but the current code only matches `http://localhost` / `http://127.0.0.1` (no `https://localhost`), and the localhost matching is prefix-based (broader than “localhost only”). The same doc also highlights rate limiting as not implemented, which remains true and is security-relevant, but may be interpreted as “documented therefore acceptable.”
+The route sets `503` for any `{ error }` result from `handleDevToken`, including cases that are permanent misconfiguration (missing env) vs transient signing errors.
 
 **Code:**
-```md
-- **T009** – CORS on dev-token route: `Access-Control-Allow-Origin` from `ALLOWED_ORIGIN` or, in dev, request origin when localhost/https.
-- **T012** – ... Fixture key in `tests/fixtures/apple-test-key.pem`.
+```ts
+const result = await handleDevToken();
+const status = "error" in result ? 503 : 200;
 ```
 
 **Why this matters:**
-Stale or imprecise docs drive configuration mistakes and can create a false sense of security about origin restrictions.
+Ambiguous status codes can mislead monitoring/alerting and may cause inappropriate automatic retries.
+
+---
+
+### LOW Finding #12: Tests only validate JWT “shape,” not required claims/headers
+
+**File:** `apps/api/tests/dev-token.test.ts`  
+**Lines:** 8-46  
+**Category:** unfinished
+
+**Description:**
+The test asserts the token matches a basic three-segment regex and is non-empty, but does not decode/validate:
+- protected header contains expected `alg`/`kid`
+- payload contains correct `iss`, `iat`, `exp`
+- `exp` respects Apple’s maximum validity window
+
+**Code:**
+```ts
+const JWT_REGEX = /^[\w-]+\.[\w-]+\.[\w-]+$/;
+...
+expect(result.token).toMatch(JWT_REGEX);
+```
+
+**Why this matters:**
+A wide range of regressions could still produce a “JWT-shaped” string while being invalid for Apple Music API, leading to production failures not caught by unit tests.
+
+---
+
+### LOW Finding #13: Repository contains a real PEM private key fixture (even if non-production)
+
+**File:** `apps/api/tests/fixtures/apple-test-key.pem`  
+**Lines:** 1-5  
+**Category:** will-break
+
+**Description:**
+A valid EC private key is committed as a test fixture. While it appears intended as a non-production test key, committing any private key material can:
+- violate repository/security policy expectations (“no private keys in repo”)
+- trigger secret scanning / compliance tooling
+- increase the chance of accidental reuse/misunderstanding by contributors
+
+**Code:**
+```pem
+-----BEGIN PRIVATE KEY-----
+...
+-----END PRIVATE KEY-----
+```
+
+**Why this matters:**
+Even “test-only” private keys are often treated as sensitive artifacts by automated tooling and by security review processes, generating noise and potential policy violations.
 
 ---
 
 ## External References
 
-- `https://nextjs.org/docs/app/building-your-application/routing/route-handlers` (accessed 2026-02-14)  
-- `https://github.com/panva/jose/discussions/478` (accessed 2026-02-14)
+- Apple Developer (WWDC22) — “Meet Apple Music API and MusicKit” (mentions max 6 months expiry and encouraging `origin` claim for web). Accessed 2026-02-15: https://developer.apple.com/videos/play/wwdc2022/10148/  
+- Stack Overflow — MusicKit JS developer token `origin` claim excerpt (secondary source quoting Apple docs). Accessed 2026-02-15: https://stackoverflow.com/questions/77624686/sending-developer-token-to-backend-how-can-i-hide-sensitive-data  
+- Stack Overflow — Developer token required header/claims and max 6 months window (secondary source). Accessed 2026-02-15: https://stackoverflow.com/questions/78813772/what-do-we-use-for-the-android-musickit-developer-token  
+- panva/jose discussion — recommends caching `createPrivateKey` output for repeated signing. Accessed 2026-02-15: https://github.com/panva/jose/discussions/158

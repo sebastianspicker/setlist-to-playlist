@@ -4,21 +4,27 @@
 
 Import a setlist from setlist.fm (URL or ID) → preview and optionally correct track matches → create an Apple Music playlist in the user's account.
 
+## Deployment Model
+
+In this repo, the **web app** (Next.js) serves both the PWA and the API. The API is implemented as Next.js Route Handlers under `apps/web/src/app/api/`, which delegate to the shared logic in the `api` package (JWT signing, setlist proxy). There is no separate API server for local development or default deployment.
+
 ## Components and Data Flow (ASCII)
 
 ```
-+------------------+     +------------------+     +------------------+
-|   PWA (Next.js)  |     |   API (optional) |     |   External       |
-|   - Import UI    |---->|   - /apple/      |---->|   - Apple Music  |
-|   - Matching UI  |     |     dev-token    |     |     API          |
-|   - Export UI    |     |   - /setlist/    |     |   - setlist.fm   |
-|   - MusicKit JS  |     |     proxy        |     |     API         |
-+------------------+     +------------------+     +------------------+
-        |                         |                         ^
-        |                         v                         |
-        |                 setlist.fm API key                |
-        |                 (server-side only)                 |
-        +---------------------------------------------------+
++------------------+     +------------------+
+|   PWA (Next.js)  |     |   External       |
+|   - Import UI    |     |   - Apple Music  |
+|   - Matching UI  |---->|     API          |
+|   - Export UI    |     |   - setlist.fm   |
+|   - MusicKit JS  |     |     API          |
+|   - /api/*       |---->|                  |
+|     dev-token    |     +------------------+
+|     setlist/proxy|              ^
+|     health       |              |
++------------------+              |
+        |                  setlist.fm API key
+        |                  (server-side only)
+        +--------------------------+
                   MusicKit: User token + Dev token
 ```
 
@@ -30,9 +36,9 @@ Import a setlist from setlist.fm (URL or ID) → preview and optionally correct 
 
 ## Token Handling
 
-- **Apple Developer Token (JWT):** Minted server-side only (`apps/api` or Next API route). Never shipped to the client in source; client receives it at runtime via a dedicated endpoint. Short-lived (e.g. 1 hour); client or API can refresh as needed.
+- **Apple Developer Token (JWT):** Minted server-side only in the `api` package; exposed via the Next.js route `GET /api/apple/dev-token`. Never shipped to the client in source; the client receives it at runtime. Short-lived (e.g. 1 hour); the client refreshes as needed.
 - **Apple User Token:** Obtained in the browser via MusicKit JS after user authorizes. Stays in the client; used for playlist create and catalog search on behalf of the user.
-- **setlist.fm API key:** If used, kept server-side (e.g. in proxy route). Client calls our proxy; we add the key and optionally cache / rate-limit.
+- **setlist.fm API key:** Kept server-side in the setlist proxy (`GET /api/setlist/proxy`). The client calls our proxy; we add the key and optionally cache / rate-limit.
 
 ## Matching Strategy
 

@@ -1,427 +1,381 @@
 # Matching UI Deep Audit Findings
 
-Audit Date: 2026-02-14T10:41:59Z  
+Audit Date: 2026-02-15T07:04:41Z  
 Files Examined: 4  
-Total Findings: 26  
+Total Findings: 16  
 
 ## Summary by Severity
 - Critical: 1
-- High: 5
-- Medium: 12
-- Low: 8
+- High: 6
+- Medium: 7
+- Low: 2
 
 ---
 
 ## Findings
 
-### [HIGH] Finding #1: Suggestion effect dependencies miss content changes (stale suggestions)
+### [CRITICAL] Finding #1: `useEffect` dependency can crash on non-array/nullable `sets` entries
+
+**File:** `apps/web/src/features/matching/MatchingView.tsx`  
+**Lines:** 14-25, 44-86  
+**Category:** will-break
+
+**Description:**
+`flattenSetlist()` explicitly tolerates malformed `setlist.sets` items by skipping non-arrays (`if (!Array.isArray(set)) continue;`). However, the `useEffect` dependency array assumes every `setlist.sets` item has a `.length` property and is safe to access:
+
+- If `setlist.sets` contains `null`, `undefined`, or a non-object, `s.length` will throw at render time, crashing the matching UI.
+- This crash path is especially concerning because the code comment and runtime behavior already anticipate malformed set data.
+
+**Code:**
+```ts
+for (const set of setlist.sets ?? []) {
+  if (!Array.isArray(set)) continue;
+}
+
+}, [setlist.id, (setlist.sets ?? []).map((s) => s.length).join(",")]);
+```
+
+**Why this matters:**
+A single malformed `sets` entry can take down the entire matching screen (hard crash), even though the rest of the component is written to tolerate malformed setlist data.
+
+---
+
+### [HIGH] Finding #2: Suggestion fetch effect dependencies are insufficient (stale suggestions + stale UI state)
 
 **File:** `apps/web/src/features/matching/MatchingView.tsx`  
 **Lines:** 44-86  
-**Category:** will-break
+**Category:** broken-logic
 
 **Description:**
-The suggestions `useEffect` re-runs only when `setlist.id` changes or when the *lengths* of each set change. If the setlist content changes (song names/artists corrected, re-ordered within a set, substitutions) but the set lengths remain the same and `id` is unchanged, the effect does not re-run, leaving `matches` and suggested Apple tracks stale relative to the rendered setlist content.
+The suggestions `useEffect` only re-runs when `setlist.id` or the comma-joined list of `set` lengths changes. It does not account for changes to:
+
+- Song names
+- Per-entry artist overrides
+- `setlist.artist` (used as fallback artist)
+- Entry order changes within sets
+- Any structural changes that preserve set lengths (e.g., swap two songs, rename, change artist)
+
+Because the component stores a snapshot of `setlistEntry` inside state (`matches`), missing an effect re-run can leave the UI showing outdated entries and suggestions.
 
 **Code:**
-```tsx
+```ts
+useEffect(() => {
+  const entriesFlat = flattenSetlist(setlist);
+  // ...
+  setMatches(entriesFlat.map((setlistEntry) => ({ setlistEntry, appleTrack: null })));
+  // ...
 // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [setlist.id, (setlist.sets ?? []).map((s) => s.length).join(",")]);
 ```
 
 **Why this matters:**
-Users can see suggestions for a previous version of the setlist and “confirm” incorrect matches without realizing the UI didn’t refresh.
+Edits/refreshes to the setlist that don’t change lengths can silently leave users matching tracks for an older version of the setlist.
 
 ---
 
-### [MEDIUM] Finding #2: Hook dependency lint is disabled, increasing risk of subtle stale-state bugs
+### [HIGH] Finding #3: UI renders from derived state snapshots, not the `setlist` prop (enables desync)
 
 **File:** `apps/web/src/features/matching/MatchingView.tsx`  
-**Lines:** 84-86  
-**Category:** slop
+**Lines:** 33-37, 44-53, 140-146  
+**Category:** broken-logic
 
 **Description:**
-The effect explicitly disables `react-hooks/exhaustive-deps`. The effect body depends on `setlist` (not just `setlist.id` and set lengths) and uses `buildSearchQuery` and `searchCatalog`. Disabling the rule removes guardrails that would otherwise highlight dependency drift over time.
+The displayed setlist content (song name/artist) comes from `matches` state (`row.setlistEntry`) rather than directly from the `setlist` prop. Since `matches` is initialized from props and only conditionally re-synced by the effect, any missed dependency update (or partial update) leaves the rendered list potentially out of sync with the actual `setlist` prop.
 
 **Code:**
-```tsx
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, [setlist.id, (setlist.sets ?? []).map((s) => s.length).join(",")]);
+```ts
+const [matches, setMatches] = useState<MatchRow[]>(() =>
+  entries.map((setlistEntry) => ({ setlistEntry, appleTrack: null }))
+);
+
+<strong>{row.setlistEntry?.name ?? "—"}</strong>
+{row.setlistEntry?.artist && (
+  <span> — {row.setlistEntry.artist}</span>
+)}
 ```
 
 **Why this matters:**
-A future refactor can introduce silent staleness (effect not re-running when it logically should) without lint catching it.
+Users can be shown (and make matching decisions against) stale setlist entries, which can cascade into incorrect playlist exports.
 
 ---
 
-### [MEDIUM] Finding #3: Suggestions are fetched sequentially (slow for larger setlists)
+### [HIGH] Finding #4: Unstable list keys (`key={index}`) can mis-associate rows and user selections
 
 **File:** `apps/web/src/features/matching/MatchingView.tsx`  
-**Lines:** 54-80  
+**Lines:** 131-139  
 **Category:** will-break
 
 **Description:**
-The suggestion loop awaits each `searchCatalog` call in series. This makes total suggestion time roughly the sum of all per-track searches. For larger setlists, the UI can remain in “Fetching suggestions…” for a long time.
-
-**Code:**
-```tsx
-for (let i = 0; i < entriesFlat.length; i++) {
-  const tracks = await searchCatalog(query, 1);
-  ...
-}
-```
-
-**Why this matters:**
-Perceived performance can degrade sharply with setlist length, and any upstream slowness (token fetch, MusicKit readiness, network) is multiplied across entries.
-
----
-
-### [HIGH] Finding #4: Missing MusicKit script can stall suggestions for N×10s and still appear as “No match”
-
-**File:** `apps/web/src/features/matching/MatchingView.tsx`  
-**Lines:** 54-80, 125-129, 148-157  
-**Category:** will-break
-
-**Description:**
-If `searchCatalog` is failing because MusicKit isn’t available (e.g., script never loaded), the loop continues per entry. Because the loop is sequential, each entry can incur the full wait before failing (see `waitForMusicKit` timeout in `musickit.ts`). Errors are caught and converted into `appleTrack: null`, so the UI shows “No match” rather than indicating a system failure.
-
-**Code:**
-```tsx
-try {
-  const tracks = await searchCatalog(query, 1);
-  ...
-} catch {
-  setMatches((prev) => { ... appleTrack: null ... });
-}
-...
-{row.appleTrack ? (...) : (<span style={{ color: "#888" }}>No match</span>)}
-```
-
-**Why this matters:**
-A configuration/runtime failure (MusicKit not present) is indistinguishable from “Apple Music has no match,” and the page can feel frozen for long periods on realistic setlists.
-
----
-
-### [MEDIUM] Finding #5: No user-visible error state for suggestion failures
-
-**File:** `apps/web/src/features/matching/MatchingView.tsx`  
-**Lines:** 61-77, 125-129, 156  
-**Category:** will-break
-
-**Description:**
-Suggestion failures are swallowed (`catch { ... }`) and rendered as “No match.” There is no UI state to communicate that suggestion search failed (network error, dev token fetch failure, MusicKit not loaded, API error).
-
-**Code:**
-```tsx
-} catch {
-  ... appleTrack: null ...
-}
-...
-<span style={{ color: "#888" }}>No match</span>
-```
-
-**Why this matters:**
-Users can’t tell whether they should manually correct a specific song vs. whether the entire matching system is currently non-functional.
-
----
-
-### [HIGH] Finding #6: Manual search results can display for the wrong row due to shared state and no request identity/cancellation
-
-**File:** `apps/web/src/features/matching/MatchingView.tsx`  
-**Lines:** 39-43, 100-114, 160-167, 181-228  
-**Category:** will-break
-
-**Description:**
-`searchQuery`, `searchResults`, and `searching` are shared across all rows, and `runSearch` does not guard its response updates based on the row/index that is currently active when the request resolves. If a user switches rows (or triggers multiple searches quickly), the latest-resolving request can overwrite `searchResults` and show results under a different row’s expanded search UI.
-
-**Code:**
-```tsx
-const [searchingIndex, setSearchingIndex] = useState<number | null>(null);
-const [searchQuery, setSearchQuery] = useState("");
-const [searchResults, setSearchResults] = useState<AppleMusicTrack[]>([]);
-...
-const tracks = await searchCatalog(q, 8);
-setSearchResults(tracks);
-```
-
-**Why this matters:**
-Users can accidentally assign the wrong Apple Music track to a setlist entry because the UI can show mismatched results without warning.
-
----
-
-### [MEDIUM] Finding #7: Manual search state is global, forcing single-search-at-a-time and causing context loss
-
-**File:** `apps/web/src/features/matching/MatchingView.tsx`  
-**Lines:** 39-43, 160-167, 88-98  
-**Category:** slop
-
-**Description:**
-The component maintains a single `searchQuery` and `searchResults` for all rows. Opening “Change” on a row clears the global search state, discarding any prior query/results. This is a UX limitation and makes multi-song corrections more tedious.
-
-**Code:**
-```tsx
-onClick={() => {
-  setSearchingIndex(index);
-  setSearchQuery("");
-  setSearchResults([]);
-}}
-```
-
-**Why this matters:**
-It increases the likelihood of user error and frustration when correcting multiple matches in sequence.
-
----
-
-### [MEDIUM] Finding #8: In-flight manual search can repopulate results after user closes/changes the selection
-
-**File:** `apps/web/src/features/matching/MatchingView.tsx`  
-**Lines:** 88-98, 100-114, 181-228  
-**Category:** will-break
-
-**Description:**
-`setMatch` closes the search UI and clears `searchResults`, but `runSearch` has no cancellation/guard. If a search is in-flight and the user selects a track (or clicks “Skip” / changes rows), the in-flight promise can later resolve and call `setSearchResults(tracks)`, repopulating results unexpectedly.
-
-**Code:**
-```tsx
-function setMatch(...) {
-  ...
-  setSearchingIndex(null);
-  setSearchQuery("");
-  setSearchResults([]);
-}
-...
-const tracks = await searchCatalog(q, 8);
-setSearchResults(tracks);
-```
-
-**Why this matters:**
-Unexpected UI updates after the user “finished” an action can cause confusion and accidental mis-clicks.
-
----
-
-### [MEDIUM] Finding #9: Rows are keyed by array index, risking incorrect UI association when the list changes
-
-**File:** `apps/web/src/features/matching/MatchingView.tsx`  
-**Lines:** 132-135, 181  
-**Category:** will-break
-
-**Description:**
-Each match row uses `key={index}`. If the underlying `matches` order/length changes (including from setlist updates or structural changes), React may reuse DOM/state incorrectly across rows. This is particularly risky because row identity is also tracked by `searchingIndex`.
+The main list uses array index keys. If rows are inserted/removed/reordered (including via setlist refresh or re-flattening), React may reuse DOM/state in a way that visually attaches the wrong match/search UI to the wrong setlist entry.
 
 **Code:**
 ```tsx
 {matches.map((row, index) => (
   <li key={index}>
-...
-{searchingIndex === index && ( ... )}
 ```
 
 **Why this matters:**
-The “Change” UI (and any transient state) can appear on the wrong song after list changes, increasing the chance of wrong matches.
+A user can believe they’re changing the match for one song while actually modifying a different row after a setlist update or reordering.
 
 ---
 
-### [LOW] Finding #10: Search input has no explicit accessible label
+### [HIGH] Finding #5: Suggestion-fetch failures are silently treated as “No match” (no error surface)
+
+**File:** `apps/web/src/features/matching/MatchingView.tsx`  
+**Lines:** 55-77, 148-157  
+**Category:** will-break
+
+**Description:**
+All failures during suggestion fetching (including MusicKit not loaded, dev token fetch failing, Apple API errors) are caught and converted into `appleTrack: null`, with no user-visible indication that the suggestion system failed.
+
+The rendered UI shows `No match` for both “no catalog result” and “system error”.
+
+**Code:**
+```ts
+try {
+  const tracks = await searchCatalog(query, 1);
+  const track = tracks[0] ?? null;
+  // ...
+} catch {
+  setMatches((prev) => { /* ... */ appleTrack: null });
+}
+
+{row.appleTrack ? (
+  <span>→ {row.appleTrack.name}</span>
+) : (
+  <span style={{ color: "#888" }}>No match</span>
+)}
+```
+
+**Why this matters:**
+A broken integration (token/API/script) can look identical to legitimate “no match” results, preventing users from diagnosing why matching is empty.
+
+---
+
+### [MEDIUM] Finding #6: Suggestions are fetched sequentially with a global loading indicator (slow + unclear progress)
+
+**File:** `apps/web/src/features/matching/MatchingView.tsx`  
+**Lines:** 55-80, 125-129  
+**Category:** slop
+
+**Description:**
+Suggestions are fetched in a `for` loop with `await` per entry, making total time scale linearly with setlist size. The UI shows a single “Fetching suggestions…” message until the entire loop completes.
+
+**Code:**
+```ts
+for (let i = 0; i < entriesFlat.length; i++) {
+  const tracks = await searchCatalog(query, 1);
+  // ...
+}
+{loadingSuggestions && <p role="status">Fetching suggestions…</p>}
+```
+
+**Why this matters:**
+Large setlists can feel sluggish with limited feedback, even though partial results may be appearing row-by-row.
+
+---
+
+### [HIGH] Finding #7: Manual search results can display under the wrong row (in-flight search not tied to index)
+
+**File:** `apps/web/src/features/matching/MatchingView.tsx`  
+**Lines:** 100-114, 160-167, 181-226  
+**Category:** broken-logic
+
+**Description:**
+Manual search uses global `searchResults`/`searching` state that is not associated with the specific row being searched. If the user changes `searchingIndex` while a search is in flight (by clicking “Change” on a different row), the in-flight promise resolves and writes results into the global `searchResults`, which will then render under whichever row is currently open.
+
+**Code:**
+```ts
+async function runSearch(index: number) {
+  // ...
+  const tracks = await searchCatalog(q, 8);
+  setSearchResults(tracks);
+}
+
+onClick={() => {
+  setSearchingIndex(index);
+  setSearchQuery("");
+  setSearchResults([]);
+}}
+
+{searchingIndex === index && (
+  <>
+    {/* ... */}
+    {searchResults.length > 0 && (
+      <ul>
+        {searchResults.map((track) => (
+          <li key={track.id}>
+            <button onClick={() => setMatch(index, track)}>{track.name}</button>
+          </li>
+        ))}
+      </ul>
+    )}
+  </>
+)}
+```
+
+**Why this matters:**
+Users can accidentally pick a result that was fetched for a different song, leading to incorrect matching selections.
+
+---
+
+### [MEDIUM] Finding #8: Manual search requests can race (no cancellation / last-resolve-wins)
+
+**File:** `apps/web/src/features/matching/MatchingView.tsx`  
+**Lines:** 100-114  
+**Category:** will-break
+
+**Description:**
+`runSearch()` does not cancel prior requests or guard against out-of-order resolution. Multiple searches (rapid clicks, Enter presses, or searches with changing queries) can resolve in an unexpected order and overwrite `searchResults` with stale data.
+
+**Code:**
+```ts
+setSearching(true);
+try {
+  const tracks = await searchCatalog(q, 8);
+  setSearchResults(tracks);
+} finally {
+  setSearching(false);
+}
+```
+
+**Why this matters:**
+Search results can flicker or regress, and the user may select from an older result set without realizing it.
+
+---
+
+### [MEDIUM] Finding #9: Manual search has no explicit “no results” or “error” UI state
+
+**File:** `apps/web/src/features/matching/MatchingView.tsx`  
+**Lines:** 106-113, 204-226  
+**Category:** unfinished
+
+**Description:**
+When search returns zero results or throws, the UI just shows nothing (empty area). There is no user-visible distinction between:
+
+- “No results for this query”
+- “Search failed (token, network, MusicKit, API error)”
+- “Haven’t searched yet”
+
+**Code:**
+```ts
+} catch {
+  setSearchResults([]);
+}
+
+{searchResults.length > 0 && (
+  <ul>
+    {searchResults.map((track) => (
+      <li key={track.id}>...</li>
+    ))}
+  </ul>
+)}
+```
+
+**Why this matters:**
+Users can’t tell whether the system is working, which increases repeated retries and confusion.
+
+---
+
+### [LOW] Finding #10: Search input is placeholder-only (missing accessible label)
 
 **File:** `apps/web/src/features/matching/MatchingView.tsx`  
 **Lines:** 183-195  
 **Category:** slop
 
 **Description:**
-The manual search `<input>` relies on placeholder text and has no `<label>` or `aria-label`.
+The search input has no associated `<label>` and relies on placeholder text. This reduces accessibility and can make the control ambiguous for assistive technologies.
 
 **Code:**
 ```tsx
 <input
   type="text"
   value={searchQuery}
-  ...
+  onChange={(e) => setSearchQuery(e.target.value)}
   placeholder="Search Apple Music…"
 />
 ```
 
 **Why this matters:**
-Screen reader users may not get a reliable control name, and placeholder-only labeling is fragile for accessibility.
+Accessibility regressions can block some users from completing manual matching.
 
 ---
 
-### [LOW] Finding #11: No “0 results” feedback for manual search
+### [MEDIUM] Finding #11: Manual-search UI state is not reset when the setlist changes
 
 **File:** `apps/web/src/features/matching/MatchingView.tsx`  
-**Lines:** 204-226  
-**Category:** unfinished
-
-**Description:**
-The UI only renders results when `searchResults.length > 0`. If a search completes with no matches (or fails and sets `[]`), nothing indicates whether the search is still running, yielded 0 results, or errored.
-
-**Code:**
-```tsx
-{searchResults.length > 0 && (
-  <ul> ... </ul>
-)}
-```
-
-**Why this matters:**
-Users can’t distinguish “no results” from “nothing happened,” causing repeated searches and confusion.
-
----
-
-### [LOW] Finding #12: Proceed gating only checks “at least one match,” not “how incomplete is the playlist”
-
-**File:** `apps/web/src/features/matching/MatchingView.tsx`  
-**Lines:** 116-117, 233-251  
-**Category:** slop
-
-**Description:**
-The “Create playlist” button becomes enabled as soon as a single match exists. The UI does not summarize how many entries are unmatched/skipped at the decision point, beyond the generic instruction text.
-
-**Code:**
-```tsx
-const canProceed = matches.some((m) => m.appleTrack !== null);
-...
-disabled={!canProceed}
-```
-
-**Why this matters:**
-A user can unintentionally create a playlist missing most songs with minimal friction and limited visibility into completeness.
-
----
-
-### [MEDIUM] Finding #13: Authorization handler can run concurrently (double init/authorize)
-
-**File:** `apps/web/src/features/matching/ConnectAppleMusic.tsx`  
-**Lines:** 21-41, 45-57, 71-77  
+**Lines:** 38-43, 44-53, 88-98  
 **Category:** will-break
 
 **Description:**
-`handleAuthorize` does not short-circuit when `loading` is already true. The “Try again” button inside the error block is not disabled during loading, and rapid clicks can invoke `initMusicKit()` / `authorizeMusicKit()` multiple times concurrently.
+On setlist changes, the effect reinitializes `matches` but does not reset `searchingIndex`, `searchQuery`, `searchResults`, or `searching`. This can leave:
 
-**Code:**
-```tsx
-async function handleAuthorize() {
-  setLoading(true);
-  try {
-    await initMusicKit();
-    await authorizeMusicKit();
-```
-
-**Why this matters:**
-Concurrent authorization flows can lead to inconsistent UI state, unexpected errors, and difficult-to-reproduce edge cases around MusicKit configuration and auth popups.
-
----
-
-### [LOW] Finding #14: Redundant initialization call (initMusicKit + authorizeMusicKit also inits)
-
-**File:** `apps/web/src/features/matching/ConnectAppleMusic.tsx`  
-**Lines:** 24-27  
-**Category:** slop
-
-**Description:**
-`handleAuthorize` calls `initMusicKit()` and then `authorizeMusicKit()`, but `authorizeMusicKit()` itself calls `initMusicKit()` (see `musickit.ts`). This duplication is unnecessary and can complicate reasoning about init sequencing.
-
-**Code:**
-```tsx
-await initMusicKit();
-await authorizeMusicKit();
-```
-
-**Why this matters:**
-It increases complexity and can amplify issues if `initMusicKit()` has side effects or races under concurrent calls.
-
----
-
-### [LOW] Finding #15: Error “friendly” mapping is brittle and may expose raw internal messages
-
-**File:** `apps/web/src/features/matching/ConnectAppleMusic.tsx`  
-**Lines:** 28-37  
-**Category:** slop
-
-**Description:**
-The “friendly” messaging relies on case-sensitive substring checks (`includes("cancel")`, `includes("denied")`, etc.). Errors that differ in casing or wording won’t be mapped. Unmatched errors are displayed verbatim to the user.
-
-**Code:**
-```tsx
-const friendly =
-  message.includes("cancel") || message.includes("denied")
-    ? "You cancelled or denied access. Click below to try again."
-    : ...
-    : message;
-```
-
-**Why this matters:**
-User-visible errors may be confusing, inconsistent, or overly technical depending on upstream error text.
-
----
-
-### [CRITICAL] Finding #16: MusicKit instance is cached indefinitely; developer token refresh is effectively disabled
-
-**File:** `apps/web/src/lib/musickit.ts`  
-**Lines:** 43-70, 96-122  
-**Category:** will-break
-
-**Description:**
-Developer tokens are cached with a TTL, but `initMusicKit()` returns early if `configuredInstance` is set and never re-fetches a developer token or reconfigures MusicKit after that point. This makes token refresh moot after the first successful configuration, and long-lived sessions can break once the developer token expires (or otherwise becomes invalid).
+- Stale query/results logically associated with an older setlist
+- `searchingIndex` pointing at a different entry after refresh/reorder
+- A hidden search panel (index out of range) with leftover state
 
 **Code:**
 ```ts
-const TOKEN_CACHE_TTL_MS = 55 * 60 * 1000;
-...
-let configuredInstance: MusicKitInstance | null = null;
+const [searchingIndex, setSearchingIndex] = useState<number | null>(null);
+const [searchQuery, setSearchQuery] = useState("");
+const [searchResults, setSearchResults] = useState<AppleMusicTrack[]>([]);
+const [searching, setSearching] = useState(false);
 
-export async function initMusicKit(): Promise<MusicKitInstance> {
-  if (configuredInstance) return configuredInstance;
-  const token = await fetchDeveloperToken();
-  const MusicKit = await waitForMusicKit();
-  MusicKit.configure({ developerToken: token, ... });
-  configuredInstance = MusicKit.getInstance();
-  return configuredInstance;
-}
+setMatches(entriesFlat.map((setlistEntry) => ({ setlistEntry, appleTrack: null })));
 ```
 
 **Why this matters:**
-After enough time in-app, catalog search, playlist creation, or add-tracks can fail due to token expiration with no supported path to recover besides a full reload.
+Users can see mismatched search behavior after setlist refreshes, including results appearing unexpectedly for the “wrong” context.
 
 ---
 
-### [HIGH] Finding #17: initMusicKit has no in-flight deduping; concurrent calls can race and double-configure
+### [HIGH] Finding #12: `searchCatalog` cache key ignores `limit` and `storefront` (truncates manual search + cross-region staleness)
 
 **File:** `apps/web/src/lib/musickit.ts`  
-**Lines:** 96-122  
-**Category:** will-break
+**Lines:** 149-203  
+**Category:** broken-logic
 
 **Description:**
-If multiple callers invoke `initMusicKit()` before `configuredInstance` is set, each call runs the full init path (fetch token, wait for script, configure). There’s no shared in-flight promise, so initialization work can be duplicated and timing-dependent.
+`searchCatalog(term, limit)` caches results only by `term`. It does not include `limit` or the resolved `storefront` in the cache key:
+
+- In matching flow, suggestions call `searchCatalog(query, 1)` first, caching only 1 result for that `term`.
+- Manual search later calls `searchCatalog(q, 8)` and will return the cached 1-result array, preventing users from seeing broader options.
+- If storefront changes (e.g., after authorization or region detection), cached results can be returned for the wrong storefront.
 
 **Code:**
 ```ts
-export async function initMusicKit(): Promise<MusicKitInstance> {
-  if (configuredInstance) return configuredInstance;
-  const token = await fetchDeveloperToken();
-  const MusicKit = await waitForMusicKit();
-  const configureResult = MusicKit.configure({ ... });
-  ...
-  configuredInstance = MusicKit.getInstance();
-  return configuredInstance;
-}
+const entry = searchCache.get(term);
+if (entry && Date.now() < entry.expires) return entry.tracks;
+
+const storefront = music.storefrontId || "us";
+// ...
+searchCache.set(term, { tracks, expires: Date.now() + SEARCH_CACHE_TTL_MS });
 ```
 
 **Why this matters:**
-Racy initialization can cause inconsistent runtime behavior and intermittent failures, especially in React where multiple components can mount and call initialization near-simultaneously.
+The “Change → Search” flow can be functionally broken (only 1 option shown) in common usage, and results may not match the user’s actual storefront context.
 
 ---
 
-### [LOW] Finding #18: waitForMusicKit leaves a timeout running after resolve (timer leak)
+### [MEDIUM] Finding #13: `waitForMusicKit()` leaves a live timeout even after resolving (timer accumulation)
 
 **File:** `apps/web/src/lib/musickit.ts`  
 **Lines:** 73-93  
 **Category:** slop
 
 **Description:**
-When `window.MusicKit` becomes available, the interval is cleared and the promise resolves, but the `setTimeout` is not cleared. The timeout handler will still run later.
+When `window.MusicKit` becomes available, the interval is cleared and the promise resolves, but the `setTimeout` is never cleared. The timeout will still fire later (up to 10s), performing work and calling `reject` after the promise already resolved.
+
+Repeated calls before MusicKit loads (or in concurrent init paths) can leave many pending timeouts.
 
 **Code:**
 ```ts
-const check = setInterval(() => { ... resolve(window.MusicKit); }, 50);
+const check = setInterval(() => {
+  if (window.MusicKit) {
+    clearInterval(check);
+    resolve(window.MusicKit);
+  }
+}, 50);
 setTimeout(() => {
   clearInterval(check);
   reject(new Error("MusicKit script did not load"));
@@ -429,187 +383,93 @@ setTimeout(() => {
 ```
 
 **Why this matters:**
-It adds avoidable background timers and can contribute to memory/timer churn when `waitForMusicKit()` is called repeatedly.
+This is an avoidable timer leak pattern that can add noise and overhead during initialization-heavy flows.
 
 ---
 
-### [HIGH] Finding #19: search cache key ignores `limit` (and storefront), causing incorrect results; suggestions can poison manual search
+### [MEDIUM] Finding #14: `initMusicKit()` / `fetchDeveloperToken()` have no in-flight guard (concurrent calls can race)
 
 **File:** `apps/web/src/lib/musickit.ts`  
-**Lines:** 149-175, 172-203  
-**Category:** broken-logic
+**Lines:** 53-70, 96-122  
+**Category:** will-break
 
 **Description:**
-`searchCatalog(term, limit)` caches results by `term` only. Calls with different `limit` values reuse the same cached tracks array. In the matching UI, suggestions call `searchCatalog(query, 1)` and manual search calls `searchCatalog(q, 8)`; if `q` matches the suggestion query, manual search can incorrectly return only the single cached result.
+Both token fetching and MusicKit configuration rely on module-level caches (`cachedToken`, `configuredInstance`) but do not gate concurrent calls:
+
+- If multiple components (or double-clicks) call `initMusicKit()` before `configuredInstance` is set, they can run parallel token fetches and parallel `MusicKit.configure()` calls.
+- `configuredInstance` is assigned after async operations; whichever concurrent call finishes last “wins,” potentially overwriting a prior configured instance.
 
 **Code:**
 ```ts
-const searchCache = new Map<string, { tracks: AppleMusicTrack[]; expires: number }>();
+let configuredInstance: MusicKitInstance | null = null;
 
-export async function searchCatalog(term: string, limit = 5): Promise<AppleMusicTrack[]> {
-  const entry = searchCache.get(term);
-  if (entry && Date.now() < entry.expires) return entry.tracks;
-  ...
-  const params = new URLSearchParams({ term, limit: String(limit), types: "songs" });
-  ...
-  searchCache.set(term, { tracks, expires: Date.now() + SEARCH_CACHE_TTL_MS });
-  return tracks;
+export async function initMusicKit(): Promise<MusicKitInstance> {
+  if (configuredInstance) return configuredInstance;
+  const token = await fetchDeveloperToken();
+  const MusicKit = await waitForMusicKit();
+  const configureResult = MusicKit.configure({ developerToken: token, /* ... */ });
+  // ...
+  configuredInstance = MusicKit.getInstance();
+  return configuredInstance;
 }
 ```
 
 **Why this matters:**
-Manual correction becomes unreliable: users may be unable to see more than one candidate result for a song, even though they requested more results.
+Racing initialization increases the chance of inconsistent behavior (multiple token requests/configure calls) during matching/search/authorization flows.
 
 ---
 
-### [MEDIUM] Finding #20: Default storefront fallback to `"us"` can yield wrong-catalog matches for non-US users
+### [MEDIUM] Finding #15: Connect flow allows concurrent authorization attempts (re-entrancy)
 
-**File:** `apps/web/src/lib/musickit.ts`  
-**Lines:** 178-186  
+**File:** `apps/web/src/features/matching/ConnectAppleMusic.tsx`  
+**Lines:** 21-40, 45-57, 71-77  
 **Category:** will-break
 
 **Description:**
-If `music.storefrontId` is falsy, the code forces `"us"`. This can produce incorrect search results (different catalogs, regional availability) for non-US users, especially before authorization if storefront isn’t populated.
+`handleAuthorize()` does not guard against re-entrancy. While the main button is disabled via `disabled={loading}`, there is a window where the handler can be triggered multiple times (double-click before React state applies), and the error “Try again” button does not check `loading` at all (it relies on `setError(null)` hiding the alert after state updates).
 
 **Code:**
 ```ts
-const storefront = music.storefrontId || "us";
-const path = `/v1/catalog/${storefront}/search?${params.toString()}`;
-```
-
-**Why this matters:**
-Matching quality and correctness can vary by region; forcing a US storefront can systematically mis-match tracks for users elsewhere.
-
----
-
-### [MEDIUM] Finding #21: searchCatalog does not validate/normalize empty or whitespace-only search terms
-
-**File:** `apps/web/src/lib/musickit.ts`  
-**Lines:** 172-185  
-**Category:** will-break
-
-**Description:**
-`searchCatalog` accepts `term` as-is and sends it to the API. There’s no guard for empty/whitespace-only strings.
-
-**Code:**
-```ts
-export async function searchCatalog(term: string, limit = 5): Promise<AppleMusicTrack[]> {
-  ...
-  const params = new URLSearchParams({ term, limit: String(limit), types: "songs" });
-```
-
-**Why this matters:**
-Callers that accidentally pass an empty term can trigger avoidable API errors or confusing “no results” behavior.
-
----
-
-### [MEDIUM] Finding #22: Token caching uses a fixed TTL instead of token claims; can drift from real expiry
-
-**File:** `apps/web/src/lib/musickit.ts`  
-**Lines:** 43-50, 52-70  
-**Category:** will-break
-
-**Description:**
-The cache expiry is calculated as “now + 55 minutes” without inspecting the JWT’s `exp` (or any server-provided expiry). If the server changes token duration, issues a shorter-lived token, or the client clock is skewed, `isTokenValid()` can return true for an actually-invalid token.
-
-**Code:**
-```ts
-const TOKEN_CACHE_TTL_MS = 55 * 60 * 1000;
-...
-tokenExpiresAt = Date.now() + TOKEN_CACHE_TTL_MS;
-```
-
-**Why this matters:**
-It can cause hard-to-diagnose failures where requests start failing even though the client believes it has a valid token.
-
----
-
-### [MEDIUM] Finding #23: fetchDeveloperToken uses default fetch caching semantics (developer token may be HTTP-cached)
-
-**File:** `apps/web/src/lib/musickit.ts`  
-**Lines:** 57-70  
-**Category:** will-break
-
-**Description:**
-The developer token is fetched via `fetch(devTokenUrl())` without explicit cache controls. Depending on hosting/proxy headers and browser behavior, the response could be cached beyond the intended in-memory lifetime.
-
-**Code:**
-```ts
-const res = await fetch(devTokenUrl());
-```
-
-**Why this matters:**
-This increases the chance of the client using stale tokens and broadens the surface area where a sensitive token might persist (e.g., HTTP caches).
-
----
-
-### [MEDIUM] Finding #24: addTracksToLibraryPlaylist can throw after partial success (invalid IDs), risking duplicate adds on retry
-
-**File:** `apps/web/src/lib/musickit.ts`  
-**Lines:** 250-253, 269-274  
-**Category:** will-break
-
-**Description:**
-If some `songIds` are invalid, the function filters them out and still performs the API call for valid IDs, but then throws an error afterwards. Higher-level flows may treat this as a failure and prompt a retry, potentially re-adding tracks that were already successfully added.
-
-**Code:**
-```ts
-const validIds = songIds.filter((id) => typeof id === "string" && id.trim().length > 0);
-...
-await music.music.api(path, { method: "POST", data });
-...
-if (validIds.length < songIds.length) {
-  throw new Error(`${dropped} of ${songIds.length} IDs were invalid...`);
-}
-```
-
-**Why this matters:**
-It creates ambiguity about outcome (“did anything succeed?”) and can lead to duplicated tracks in the created playlist depending on how the UI handles retries.
-
----
-
-### [LOW] Finding #25: isMusicKitAuthorized swallows all initialization errors, hiding the root cause
-
-**File:** `apps/web/src/lib/musickit.ts`  
-**Lines:** 140-147  
-**Category:** slop
-
-**Description:**
-All errors (missing script, missing app ID, dev token fetch failure, etc.) are caught and converted into `false` with no surfaced context.
-
-**Code:**
-```ts
-export async function isMusicKitAuthorized(): Promise<boolean> {
+async function handleAuthorize() {
+  setError(null);
+  setLoading(true);
   try {
-    const music = await initMusicKit();
-    return music.isAuthorized === true;
-  } catch {
-    return false;
+    await initMusicKit();
+    await authorizeMusicKit();
+    onAuthorized?.();
+  } finally {
+    setLoading(false);
   }
 }
+
+<button onClick={handleAuthorize} disabled={loading}>...</button>
+
+<button type="button" onClick={handleAuthorize}>Try again</button>
 ```
 
 **Why this matters:**
-It makes it difficult for the UI to distinguish “not authorized” from “MusicKit is broken/unavailable,” resulting in misleading UX.
+Concurrent authorization flows can create unpredictable UX (multiple prompts / racing init calls) and magnify the initialization race risks in `musickit.ts`.
 
 ---
 
-### [LOW] Finding #26: Expired search cache entries persist unless cache exceeds max size
+### [LOW] Finding #16: Error classification is fragile and can surface raw internal messages
 
-**File:** `apps/web/src/lib/musickit.ts`  
-**Lines:** 154-166, 173-176  
+**File:** `apps/web/src/features/matching/ConnectAppleMusic.tsx`  
+**Lines:** 29-37  
 **Category:** slop
 
 **Description:**
-Expired entries are only purged opportunistically by `evictSearchCache()`, and `evictSearchCache()` returns early if the cache is not above `SEARCH_CACHE_MAX_SIZE`. This means expired entries can remain in memory until the cache grows large enough to trigger eviction behavior, even though they’re no longer usable.
+The code matches substrings in the error message (`includes("cancel")`, `includes("denied")`, etc.) in a case-sensitive way and otherwise displays the raw error message. This is brittle and may lead to inconsistent user-facing messaging depending on the exact casing/wording of underlying errors.
 
 **Code:**
 ```ts
-function evictSearchCache(): void {
-  if (searchCache.size <= SEARCH_CACHE_MAX_SIZE) return;
-  ...
-}
+const friendly =
+  message.includes("cancel") || message.includes("denied")
+    ? "You cancelled or denied access. Click below to try again."
+    : message.includes("revoked") || message.includes("unauthorized")
+      ? "Apple Music access was revoked. Click below to connect again."
+      : message;
 ```
 
 **Why this matters:**
-While bounded, the cache can retain unnecessary data and contributes to long-lived memory usage patterns in a session.
+Users may see confusing or overly-technical errors, and “friendly” messaging may fail to trigger for the same underlying scenario if message casing differs.

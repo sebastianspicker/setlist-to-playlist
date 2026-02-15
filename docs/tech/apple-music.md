@@ -18,7 +18,7 @@ See [Apple’s Music Kit documentation](https://developer.apple.com/documentatio
 
 ## Endpoints (our side)
 
-- `GET /apple/dev-token` (or equivalent): Returns `{ token: "…" }` or `{ error: "…" }`. CORS restricted to our frontend origin.
+- `GET /api/apple/dev-token`: Returns `{ token: "…" }` or `{ error: "…" }`. Implemented as a Next.js Route Handler in `apps/web/src/app/api/apple/dev-token/route.ts`; CORS restricted to the configured frontend origin(s).
 
 ## MusicKit Usage (client)
 

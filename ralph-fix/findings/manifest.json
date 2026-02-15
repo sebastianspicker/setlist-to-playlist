@@ -1,70 +1,70 @@
 {
-  "generatedAt": "2026-02-14T16:33:26.505Z",
+  "generatedAt": "2026-02-15T08:47:07.004Z",
   "audits": [
     {
       "auditId": "01-api-routes",
       "sourceFile": "01-api-routes.md",
-      "findingsCount": 1
+      "findingsCount": 10
     },
     {
       "auditId": "02-apple-token",
       "sourceFile": "02-apple-token.md",
-      "findingsCount": 12
+      "findingsCount": 0
     },
     {
       "auditId": "03-setlist-proxy",
       "sourceFile": "03-setlist-proxy.md",
-      "findingsCount": 16
+      "findingsCount": 12
     },
     {
       "auditId": "04-core-setlist-matching",
       "sourceFile": "04-core-setlist-matching.md",
-      "findingsCount": 13
+      "findingsCount": 0
     },
     {
       "auditId": "05-setlist-import-ui",
       "sourceFile": "05-setlist-import-ui.md",
-      "findingsCount": 12
+      "findingsCount": 0
     },
     {
       "auditId": "06-matching-ui",
       "sourceFile": "06-matching-ui.md",
-      "findingsCount": 26
+      "findingsCount": 16
     },
     {
       "auditId": "07-playlist-export",
       "sourceFile": "07-playlist-export.md",
-      "findingsCount": 12
+      "findingsCount": 13
     },
     {
       "auditId": "08-app-pages-layout",
       "sourceFile": "08-app-pages-layout.md",
-      "findingsCount": 0
+      "findingsCount": 12
     },
     {
       "auditId": "09-config-cors",
       "sourceFile": "09-config-cors.md",
-      "findingsCount": 15
+      "findingsCount": 14
     },
     {
       "auditId": "10-error-handling",
       "sourceFile": "10-error-handling.md",
-      "findingsCount": 0
+      "findingsCount": 16
     },
     {
       "auditId": "11-types",
       "sourceFile": "11-types.md",
-      "findingsCount": 16
+      "findingsCount": 17
     },
     {
       "auditId": "12-tests",
       "sourceFile": "12-tests.md",
-      "findingsCount": 16
+      "findingsCount": 17
     },
     {
       "auditId": "13-lib-utils",
       "sourceFile": "13-lib-utils.md",
-      "findingsCount": 1
+      "findingsCount": 14
     },
     {
       "auditId": "14-pwa-assets",
@@ -74,7 +74,7 @@
     {
       "auditId": "15-dead-code",
       "sourceFile": "15-dead-code.md",
-      "findingsCount": 18
+      "findingsCount": 15
     }
   ]
 }

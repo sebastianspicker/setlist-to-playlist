@@ -12,9 +12,10 @@ Apply **code fixes** from the [Ralph audit](https://gist.github.com/DMontgomery4
 
 2. **Fix loop** – For each fix story with `passes: false`, the script:
    - Loads the story’s findings from `ralph-fix/findings/<findingsFile>.json`
-   - Builds a prompt (story + findings JSON + CODEX.md)
-   - Runs **Codex without read-only** so it can edit source files
+   - Builds a prompt (story + findings JSON + CODEX.md, including instruction to write a fix report)
+   - Runs **Codex without read-only** so it can edit source files (full debug: fix, lint, test, iterate)
    - Runs **pnpm lint** and **pnpm test**; marks the story passed only if both succeed
+   - Implemented fixes are documented by the agent in **ralph-fix/fixes/<FIX-XXX>.md** (audit-style: File, Lines, Severity, Description, Fix applied)
 
 ## Prereqs
 
@@ -38,6 +39,7 @@ chmod +x ralph-fix.sh
 
 Options:
 
+- `./ralph-fix.sh --write-fix-reports-only` – do not run Codex; generate `ralph-fix/fixes/FIX-XXX.md` from findings JSON for every story that already has `passes: true`. Use this to backfill the fixes folder after a run where the agent did not write the reports.
 - `./ralph-fix.sh 15 --skip-verify` – do not run lint/test after each story (still mark passed when Codex finishes)
 - `./ralph-fix.sh 15 --no-search` – disable web search
 - `./ralph-fix.sh 15 --skip-security-check` – skip credential warning
@@ -47,11 +49,15 @@ Options:
 - `ralph-fix/events.log` – high-level progress
 - `ralph-fix/run.log` – full Codex output and verification output
 
+## Output
+
+- **ralph-fix/fixes/** – After each story passes, the agent writes a markdown report here (e.g. `FIX-001.md`) in the same style as the audit reports: for each finding fixed, File, Lines, Severity, Description, and Fix applied.
+
 ## Customize
 
-- **prd.json** – Fix stories and `findingsFile` per story; verification commands.
-- **CODEX.md** – Fixer instructions (priority Critical → High → Medium, run lint/test).
-- **ralph-fix.sh** – Model (`REQUESTED_MODEL`), optional verification skip.
+- **prd.json** – Fix stories and `findingsFile` per story; verification commands. Set `passes: false` for all stories to run a full pass from scratch.
+- **CODEX.md** – Fixer instructions (full debug, priority Critical → High → Medium, run lint/test, write fix report).
+- **ralph-fix.sh** – Model (`REQUESTED_MODEL`), creates `fixes/` dir, injects fix-report path into prompt; optional verification skip.
 
 ## Relation to ralph-audit
 

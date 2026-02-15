@@ -1,75 +1,175 @@
 # Config, Environment & CORS Findings
 
-Audit Date: 2026-02-14T11:00:50Z  
-Files Examined: 23  
-Total Findings: 15
+Audit Date: 2026-02-15  
+Files Examined: 25  
+Total Findings: 14
 
 ## Summary by Severity
 - Critical: 1
-- High: 4
+- High: 1
 - Medium: 6
-- Low: 4
+- Low: 6
 
 ---
 
 ## Findings
 
-### [CRITICAL] Finding #1: CORS “localhost” check is prefix-based and can be bypassed by attacker-controlled origins
+### [CRITICAL] Finding #1: “Localhost” origin check can allow non-local attacker origins when `ALLOWED_ORIGIN` is unset
 
 **File:** `apps/web/src/lib/cors.ts`  
-**Lines:** 7-17  
-**Category:** will-break
+**Lines:** 8-18  
+**Category:** broken-logic
 
 **Description:**
-`getAllowOrigin()` treats any `Origin` string that *starts with* `http://localhost` or `http://127.0.0.1` as “local”. This is not an exact host match. An attacker can host a page on an origin like `http://localhost.evil.com` (a valid origin) which passes the `startsWith("http://localhost")` check. When `ALLOWED_ORIGIN` is unset (or mis-set such that `single` becomes empty), the server will reflect that attacker origin in `Access-Control-Allow-Origin`, allowing browser JS on that origin to read responses from `/api/apple/dev-token`, `/api/setlist/proxy`, and `/api/health`.
+`getAllowOrigin()` treats any `Origin` that *starts with* `http://localhost` or `http://127.0.0.1` as “local” and returns it when `ALLOWED_ORIGIN` is unset. Because this is a string-prefix check (not a hostname check), it also matches attacker-controlled domains like `http://localhost.evil.com` (and similar prefix tricks). In that misconfigured state (unset `ALLOWED_ORIGIN`), the API routes using `corsHeaders()` will emit `Access-Control-Allow-Origin` for an attacker origin, enabling browser JS on that attacker site to read responses.
 
 **Code:**
 ```ts
-const isLocalOrigin =
-  origin &&
-  (origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1"));
-...
-return isLocalOrigin ? origin : null;
+export function getAllowOrigin(origin: string | null): string | null {
+  const configured = (process.env.ALLOWED_ORIGIN ?? "").trim();
+  const isLocalOrigin =
+    origin &&
+    (origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1"));
+  if (configured) {
+    const single = configured.split(",")[0].trim().replace(/\/$/, "");
+    return single || (isLocalOrigin ? origin : null);
+  }
+  return isLocalOrigin ? origin : null;
+}
 ```
 
 **Why this matters:**
-This is a credential/data exposure vector via browser CORS: a hostile web origin can read the Developer Token response (and proxy responses) if `ALLOWED_ORIGIN` isn’t set correctly.
+If `ALLOWED_ORIGIN` is forgotten/missing in a deployment where the dev-token/proxy endpoints are reachable cross-origin, this becomes a credential/data exposure path (Developer Token and setlist proxy responses become readable from attacker origins).
 
 ---
 
-### [HIGH] Finding #2: `ALLOWED_ORIGIN` is under-validated; common misformats can silently break CORS or behave unexpectedly
+### [HIGH] Finding #2: `NEXT_PUBLIC_APPLE_MUSIC_APP_ID` can pass “required” validation but still be used with invalid whitespace
 
-**File:** `apps/web/src/lib/cors.ts`  
-**Lines:** 8-15  
+**File:** `apps/web/src/lib/config.ts`  
+**Lines:** 18-20  
 **Category:** will-break
 
 **Description:**
-`ALLOWED_ORIGIN` is only `.trim()`’d and then treated as a single origin via `split(",")[0]`. There is no validation/normalization that it is a valid *origin* (scheme + host + optional port, no trailing slash, no path). Examples of problematic but plausible operator inputs:
-- Trailing slash: `https://app.example.com/` (not a valid origin value for `Access-Control-Allow-Origin`).
-- Comma-separated list: `https://a.example.com, https://b.example.com` (only the first is used; the second silently never works).
-- Leading comma: `,https://app.example.com` (first entry trims to empty string, triggering the fallback behavior and potentially re-enabling the “local origin” reflection logic).
+`APPLE_MUSIC_APP_ID` is exported as-is (no trimming/normalization). Downstream, `initMusicKit()` checks `APPLE_MUSIC_APP_ID.trim() === ""` to detect blank config, but then calls `MusicKit.configure` with the **untrimmed** value. A value like `" my-app-id "` passes the “required” check yet is still used with whitespace.
+
+**Code:**
+```ts
+export const APPLE_MUSIC_APP_ID =
+  process.env.NEXT_PUBLIC_APPLE_MUSIC_APP_ID ?? "";
+```
+
+**File:** `apps/web/src/lib/musickit.ts`  
+**Lines:** 103-116  
+**Category:** will-break
+
+**Code:**
+```ts
+if (!APPLE_MUSIC_APP_ID || APPLE_MUSIC_APP_ID.trim() === "") {
+  throw new Error(
+    "NEXT_PUBLIC_APPLE_MUSIC_APP_ID is required for MusicKit. Set it in your environment (see .env.example)."
+  );
+}
+const configureResult = MusicKit.configure({
+  developerToken: token,
+  app: { name: "Setlist to Playlist", build: "1" },
+  appId: APPLE_MUSIC_APP_ID,
+});
+```
+
+**Why this matters:**
+This creates a configuration “gotcha” where production can break despite appearing configured, and failures will look like downstream MusicKit issues rather than a simple env formatting issue.
+
+---
+
+### [MEDIUM] Finding #3: Trailing-slash normalization is incomplete; multiple trailing slashes can produce malformed API URLs (including `//api` and `/api//api`)
+
+**File:** `apps/web/src/lib/config.ts`  
+**Lines:** 12-16  
+**Category:** will-break
+
+**Description:**
+`API_BASE_URL` only strips **one** trailing `/` via `.replace(/\/$/, "")`. If `NEXT_PUBLIC_API_URL` ends with multiple slashes (common copy/paste), it can leave `API_BASE_URL` with trailing `//`, which then interacts badly with `apiUrl()`’s `/api` stripping and concatenation.
+
+**Code:**
+```ts
+export const API_BASE_URL: string =
+  typeof process.env.NEXT_PUBLIC_API_URL === "string" &&
+  process.env.NEXT_PUBLIC_API_URL.trim().length > 0
+    ? process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/$/, "")
+    : "";
+```
+
+**File:** `apps/web/src/lib/api.ts`  
+**Lines:** 12-19  
+**Category:** will-break
+
+**Code:**
+```ts
+const raw = API_BASE_URL || "";
+const base = raw.replace(/\/$/, "").replace(/\/api$/i, "");
+...
+if (base) return `${base}${apiSegment}${p}`;
+```
+
+**Why this matters:**
+Operators can set `NEXT_PUBLIC_API_URL=https://example.com/api///` and end up with URLs like `https://example.com/api//api/...`, which can break requests and be very difficult to diagnose (especially when only some environments have “extra slash” values).
+
+---
+
+### [MEDIUM] Finding #4: `apiUrl()` always forces an `/api` segment; any non-standard base path produces surprising URLs
+
+**File:** `apps/web/src/lib/api.ts`  
+**Lines:** 12-18  
+**Category:** will-break
+
+**Description:**
+When `API_BASE_URL` is set, `apiUrl()` always appends `"/api"` (via `apiSegment`) after optionally stripping a trailing `/api`. If a deployment mounts the API under a different path (e.g. `/api/v1`) or expects root-mounted endpoints, the helper will still generate `.../api/...`.
+
+**Code:**
+```ts
+const base = raw.replace(/\/$/, "").replace(/\/api$/i, "");
+const apiSegment = "/api";
+if (base) return `${base}${apiSegment}${p}`;
+return `${API_PATH}${p}`;
+```
+
+**Why this matters:**
+This is a sharp edge in configuration: the env var name (`NEXT_PUBLIC_API_URL`) implies “base URL”, but the helper’s behavior implies “origin (optionally with `/api`)”. Misalignment can lead to hard-to-debug 404s (wrong constructed URL).
+
+---
+
+### [MEDIUM] Finding #5: `ALLOWED_ORIGIN` accepts invalid/ambiguous values (paths, multiple origins) and only partially normalizes trailing slashes
+
+**File:** `apps/web/src/lib/cors.ts`  
+**Lines:** 9-16  
+**Category:** will-break
+
+**Description:**
+- The implementation takes only the first comma-separated origin (`split(",")[0]`) and silently ignores additional entries.
+- It removes only a single trailing slash (`replace(/\/$/, "")`), so values with multiple trailing slashes remain malformed.
+- It does not guard against `ALLOWED_ORIGIN` including a path (e.g. `https://app.example.com/some/path`), which is not a valid `Access-Control-Allow-Origin` value.
 
 **Code:**
 ```ts
 const configured = (process.env.ALLOWED_ORIGIN ?? "").trim();
 ...
-const single = configured.split(",")[0].trim();
+const single = configured.split(",")[0].trim().replace(/\/$/, "");
 return single || (isLocalOrigin ? origin : null);
 ```
 
 **Why this matters:**
-Misconfiguration can cause production-only failures (frontend can’t read API responses due to CORS) or degrade the intended origin restriction behavior in surprising ways.
+CORS configuration errors typically manifest as opaque “CORS error” in browsers; these normalization gaps increase the chance that “looks correct” env values fail at runtime.
 
 ---
 
-### [HIGH] Finding #3: Preflight (OPTIONS) responses are incomplete; CORS can fail for non-simple requests
+### [MEDIUM] Finding #6: CORS headers vary by request `Origin` but responses do not emit `Vary: Origin`
 
 **File:** `apps/web/src/lib/cors.ts`  
-**Lines:** 19-27  
+**Lines:** 20-28  
 **Category:** will-break
 
 **Description:**
-`corsHeaders()` only sets `Content-Type` and (optionally) `Access-Control-Allow-Origin`. It does **not** include common preflight headers such as `Access-Control-Allow-Methods`, `Access-Control-Allow-Headers`, or `Access-Control-Max-Age`. The API routes implement `OPTIONS` handlers (e.g., `apps/web/src/app/api/apple/dev-token/route.ts:5-7`, `apps/web/src/app/api/setlist/proxy/route.ts:5-7`, `apps/web/src/app/api/health/route.ts:6-8`) but they return the same minimal headers, which can cause browsers to reject cross-origin requests that trigger preflight (custom headers, credentials mode changes, future method changes, etc.).
+When `ALLOWED_ORIGIN` is unset, `getAllowOrigin()` may echo back the request’s `Origin`. That means the response varies by `Origin`, but the headers do not include `Vary: Origin`. Intermediary caching (CDNs/proxies) can cache a response and serve it with a mismatched `Access-Control-Allow-Origin` behavior.
 
 **Code:**
 ```ts
@@ -85,263 +185,194 @@ export function corsHeaders(request: NextRequest, contentType = "application/jso
 ```
 
 **Why this matters:**
-Clients can experience opaque “CORS error” failures even when the origin is intended to be allowed.
+Caching/CORS interactions are a common source of production-only failures and confusing security postures (the wrong origin may appear “allowed” or “blocked” depending on cache state).
 
 ---
 
-### [MEDIUM] Finding #4: Responses vary by `Origin` but do not include `Vary: Origin` (cache correctness risk)
+### [LOW] Finding #7: “Local origin” logic excludes `https://localhost` (dev environments using HTTPS will fail unless `ALLOWED_ORIGIN` is set)
 
 **File:** `apps/web/src/lib/cors.ts`  
-**Lines:** 19-27  
+**Lines:** 10-12  
 **Category:** will-break
 
 **Description:**
-When `ALLOWED_ORIGIN` is unset (or when fallback returns the request’s origin), the value of `Access-Control-Allow-Origin` varies based on the incoming `Origin` header. The implementation does not emit `Vary: Origin`. Intermediary caches (CDNs, proxies) can cache a response with one `Access-Control-Allow-Origin` value and serve it to a different requesting origin, causing incorrect CORS behavior.
+The “local” fallback only recognizes `http://localhost…` and `http://127.0.0.1…`. It does not recognize `https://localhost…` or `https://127.0.0.1…`.
 
 **Code:**
 ```ts
-const headers: HeadersInit = { "Content-Type": contentType };
-if (allowOrigin) {
-  (headers as Record<string, string>)["Access-Control-Allow-Origin"] = allowOrigin;
-}
+const isLocalOrigin =
+  origin &&
+  (origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1"));
 ```
 
 **Why this matters:**
-Caching edge cases can produce confusing, inconsistent CORS behavior across users/origins.
+Developers using HTTPS locally (or tools that serve HTTPS by default) can get unexpected CORS failures in dev/test setups.
 
 ---
 
-### [HIGH] Finding #5: Unhandled exceptions can cause responses without CORS headers (browser sees “CORS error” instead of JSON)
+### [LOW] Finding #8: `.env.example` CORS guidance is incomplete and slightly inaccurate
 
-**File:** `apps/web/src/app/api/setlist/proxy/route.ts`  
-**Lines:** 13-30  
-**Category:** will-break
+**File:** `.env.example`  
+**Lines:** 18-19  
+**Category:** slop
 
 **Description:**
-The handler directly awaits `handleSetlistProxy(id)` and then `JSON.stringify(body)` without a `try/catch`. If `handleSetlistProxy` throws (e.g., network-level fetch error in upstream code) or if serialization throws, Next.js will generate a framework error response outside this handler’s explicit `corsHeaders(request)` usage. In cross-origin browser usage, this frequently manifests as an opaque “CORS error” because the thrown-path response may not include `Access-Control-Allow-Origin` or a JSON body.
+- The guidance says “only http://localhost is allowed” when unset, but the code also allows `http://127.0.0.1…` and has more nuanced behavior.
+- `ALLOWED_ORIGIN` is only shown as a commented example (no placeholder assignment line), which increases the chance it is missed.
 
 **Code:**
-```ts
-const result = await handleSetlistProxy(id);
-...
-return new Response(JSON.stringify(body), {
-  status,
-  headers: corsHeaders(request),
-});
+```env
+# CORS: required in production. When unset, only http://localhost is allowed (DCI-001).
+# ALLOWED_ORIGIN=https://your-app.example.com
 ```
 
 **Why this matters:**
-CORS and error-handling interact: the “happy path” includes CORS headers, but the thrown-path likely does not, degrading reliability and debuggability.
+CORS misconfiguration frequently looks like an application outage from the browser perspective; incomplete examples increase operational risk.
 
 ---
 
-### [MEDIUM] Finding #6: `NEXT_PUBLIC_APPLE_MUSIC_APP_ID` is not normalized before use; whitespace can pass validation but break configuration
+### [MEDIUM] Finding #9: Apple Music docs list a dev-token endpoint path that does not match the implemented Next.js route
 
-**File:** `apps/web/src/lib/musickit.ts`  
-**Lines:** 103-116  
-**Category:** will-break
+**File:** `docs/tech/apple-music.md`  
+**Lines:** 19-22  
+**Category:** slop
 
 **Description:**
-The code checks `APPLE_MUSIC_APP_ID.trim() === ""` to detect missing/blank config, but then passes the **untrimmed** `APPLE_MUSIC_APP_ID` to `MusicKit.configure`. If the env value contains leading/trailing whitespace (e.g., `" my-app-id "`), it passes the “required” check but still uses the invalid spaced value downstream. This is amplified by `apps/web/src/lib/config.ts:18-20`, which exports `APPLE_MUSIC_APP_ID` from `process.env` without trimming.
+The docs state `GET /apple/dev-token (or equivalent)` but the current implemented route is `GET /api/apple/dev-token` (`apps/web/src/app/api/apple/dev-token/route.ts:9-23`). This ambiguity is directly relevant to `NEXT_PUBLIC_API_URL` usage and reverse-proxy / monitoring configuration.
 
 **Code:**
-```ts
-if (!APPLE_MUSIC_APP_ID || APPLE_MUSIC_APP_ID.trim() === "") { ... }
-...
-appId: APPLE_MUSIC_APP_ID,
+```md
+## Endpoints (our side)
+
+- `GET /apple/dev-token` (or equivalent): Returns `{ token: "…" }` ...
 ```
 
 **Why this matters:**
-This creates a subtle “looks configured but still fails” class of production configuration bugs.
+Operators may configure base URLs, proxy rewrites, or uptime checks against the wrong path, leading to “works locally” but fails in deployment.
 
 ---
 
-### [MEDIUM] Finding #7: `NEXT_PUBLIC_API_URL` trailing-slash normalization only removes one slash; multiple slashes can produce malformed URLs
+### [MEDIUM] Finding #10: `docs/code-inspection-findings.md` contains high-impact stale/contradictory CORS claims
+
+**File:** `docs/code-inspection-findings.md`  
+**Lines:** 33-60  
+**Category:** slop
+
+**Description:**
+The document simultaneously claims:
+- In the top “Fixes applied” table that only `http://localhost*` is allowed when `ALLOWED_ORIGIN` is unset (line 15), **and**
+- In the summary + detailed section that CORS allows **any HTTPS origin** when `ALLOWED_ORIGIN` is unset (lines 33 and 55-60), including a code snippet that no longer matches the current implementation.
+
+**Code:**
+```md
+| DCI-001  | P0       | §2 API Token   | CORS allows any HTTPS origin when `ALLOWED_ORIGIN` unset |
+
+### DCI-001 — CORS allows any HTTPS origin when `ALLOWED_ORIGIN` is unset [P0]
+- **What:** `allowOrigin` is set to `ALLOWED_ORIGIN || ... origin.startsWith("https://") ...`
+```
+
+**Why this matters:**
+This is security-relevant documentation. Stale claims can cause incorrect risk assessments, incorrect incident response, and misinformed changes to CORS configuration.
+
+---
+
+### [MEDIUM] Finding #11: Multiple “completed plan” docs still describe a different CORS fallback behavior (“localhost/https”)
+
+**File:** `docs/exec-plans/completed/002-api-dev-token.md`  
+**Lines:** 7-12  
+**Category:** slop
+
+**Description:**
+The dev-token completion notes claim dev fallback allows “localhost/https”, which does not match the current `apps/web/src/lib/cors.ts` logic (http-only localhost/127.0.0.1 checks).
+
+**Code:**
+```md
+- **T009** – CORS on dev-token route: `Access-Control-Allow-Origin` from `ALLOWED_ORIGIN` or, in dev, request origin when localhost/https.
+```
+
+**File:** `docs/exec-plans/completed/003-api-setlistfm-proxy.md`  
+**Lines:** 12-14  
+**Category:** slop
+
+**Code:**
+```md
+- **T019** – CORS on setlist proxy route (same pattern as dev-token: `ALLOWED_ORIGIN` or request origin for localhost/https).
+```
+
+**Why this matters:**
+These docs are likely referenced for environment setup. When they disagree with code, they increase the odds of broken deployments or incorrect assumptions about what’s allowed cross-origin.
+
+---
+
+### [LOW] Finding #12: `NEXT_PUBLIC_*` values are build-time substituted in the client; docs/UX may implicitly suggest runtime configurability
 
 **File:** `apps/web/src/lib/config.ts`  
 **Lines:** 12-16  
 **Category:** will-break
 
 **Description:**
-`API_BASE_URL` does `.trim().replace(/\/$/, "")`, which removes only a single trailing slash. Values like `http://localhost:3000///` normalize to `http://localhost:3000//` (still has trailing slash(es)). `apps/web/src/lib/api.ts:14-18` also only removes a single trailing slash before concatenation. This can produce URLs containing `//api/...`, which can cause inconsistent behavior depending on intermediaries and servers.
+The web app config reads `process.env.NEXT_PUBLIC_*` in a module export. In Next.js, `NEXT_PUBLIC_*` values used in client bundles are typically inlined at build time. If operators expect to change `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_APPLE_MUSIC_APP_ID` without rebuilding/redeploying, the running client may keep using old values.
 
 **Code:**
 ```ts
-? process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/$/, "")
-: "";
+export const API_BASE_URL: string =
+  typeof process.env.NEXT_PUBLIC_API_URL === "string" &&
+  process.env.NEXT_PUBLIC_API_URL.trim().length > 0
+    ? process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/$/, "")
+    : "";
 ```
 
 **Why this matters:**
-URL construction becomes sensitive to minor formatting differences in env values, creating hard-to-diagnose environment-specific failures.
+Misunderstanding env lifecycle can lead to “we changed the env var but nothing changed” incidents, especially during cutovers between same-origin and separate API setups.
 
 ---
 
-### [MEDIUM] Finding #8: `apiUrl()` hard-codes the `/api` prefix; base URLs with path prefixes (or APIs mounted differently) can break
+### [LOW] Finding #13: Preflight `Access-Control-Allow-Headers` is hard-coded to `Content-Type` only
 
-**File:** `apps/web/src/lib/api.ts`  
-**Lines:** 4-18  
+**File:** `apps/web/src/lib/cors.ts`  
+**Lines:** 33-42  
 **Category:** will-break
 
 **Description:**
-`apiUrl()` always appends `"/api"` when `API_BASE_URL` is set. It only strips a trailing `/api` from the base (case-insensitive). If an operator sets `NEXT_PUBLIC_API_URL` to a URL that already includes a path prefix other than exactly `/api` (e.g., `https://example.com/api/v1`), the constructed URLs become `https://example.com/api/v1/api/...`. Likewise, if a future “standalone API” is mounted at root without `/api`, this helper still forces `/api`.
+`corsHeadersForOptions()` only allows `Content-Type`. If future browser requests include non-simple headers (e.g. `Authorization`) or other requested headers, preflight can fail.
 
 **Code:**
 ```ts
-const base = raw.replace(/\/$/, "").replace(/\/api$/i, "");
-...
-const apiSegment = "/api";
-if (base) return `${base}${apiSegment}${p}`;
+headers["Access-Control-Allow-Methods"] = "GET, OPTIONS";
+headers["Access-Control-Allow-Headers"] = "Content-Type";
 ```
 
 **Why this matters:**
-This is a configuration footgun when environments differ (same-origin Next.js vs. separate API host vs. reverse-proxied paths).
+This is a latent integration hazard: CORS may appear fine today (GET-only, simple requests) but break when request shapes evolve.
 
 ---
 
-### [LOW] Finding #9: Misleading/duplicated URL-building comments/constants add confusion to config expectations
-
-**File:** `apps/web/src/lib/api.ts`  
-**Lines:** 3-7  
-**Category:** slop
-
-**Description:**
-The comment says “Base path … (same app: /api, or empty when using API_BASE_URL with trailing path)”, but the implementation always uses `"/api"` as the segment for both same-origin and `API_BASE_URL` cases. Additionally, both `API_PATH` and `apiSegment` represent the same literal value.
-
-**Code:**
-```ts
-/** Base path ... (same app: /api, or empty when using API_BASE_URL with trailing path). */
-const API_PATH = "/api";
-...
-const apiSegment = "/api";
-```
-
-**Why this matters:**
-It increases the chance of operators assuming unsupported base URL shapes are supported.
-
----
-
-### [MEDIUM] Finding #10: `.env.example` CORS guidance is partially inaccurate and omits critical formatting constraints
-
-**File:** `.env.example`  
-**Lines:** 18-19  
-**Category:** will-break
-
-**Description:**
-The `.env.example` comment states that when `ALLOWED_ORIGIN` is unset, only `http://localhost` is allowed. Current code also allows `http://127.0.0.1*` and uses prefix matching (see `apps/web/src/lib/cors.ts:9-16`). The example also does not warn that `ALLOWED_ORIGIN` must be a single exact origin value (no trailing slash, no comma-separated list), even though the implementation only uses the first comma-separated entry and otherwise emits the value as-is.
-
-**Code:**
-```dotenv
-# CORS: required in production. When unset, only http://localhost is allowed (DCI-001).
-# ALLOWED_ORIGIN=https://your-app.example.com
-```
-
-**Why this matters:**
-Operators can deploy with subtly broken or insecure CORS due to misleading/incomplete env documentation.
-
----
-
-### [MEDIUM] Finding #11: Apple Music docs reference a dev-token endpoint path that does not match the actual API routes
-
-**File:** `docs/tech/apple-music.md`  
-**Lines:** 19-22  
-**Category:** will-break
-
-**Description:**
-The docs list `GET /apple/dev-token` (or equivalent), but the implemented route is `GET /api/apple/dev-token` (`apps/web/src/app/api/apple/dev-token/route.ts:9-16`). This mismatch can lead to incorrect reverse-proxy rules, monitoring checks, or client assumptions when configuring `NEXT_PUBLIC_API_URL`.
-
-**Code:**
-```md
-- `GET /apple/dev-token` (or equivalent): Returns `{ token: "…" }` or `{ error: "…" }`. CORS restricted to our frontend origin.
-```
-
-**Why this matters:**
-Path mismatches in configuration docs regularly cause production outages and misrouted traffic.
-
----
-
-### [LOW] Finding #12: Multiple internal docs describe a different (older) CORS policy than the code actually enforces
-
-**File:** `docs/code-inspection-findings.md`  
-**Lines:** 55-60  
-**Category:** slop
-
-**Description:**
-Several internal docs describe a CORS behavior that no longer matches the implementation:
-- `docs/code-inspection-findings.md:55-60` claims “any HTTPS origin” is reflected when `ALLOWED_ORIGIN` is unset.
-- `docs/exec-plans/completed/002-api-dev-token.md:7-11` and `docs/exec-plans/completed/003-api-setlistfm-proxy.md:11-14` describe a localhost/**https** fallback.
-Current code (`apps/web/src/lib/cors.ts:9-16`) does not implement those behaviors. This can lead to incorrect security assumptions during review or deployment.
-
-**Code:**
-```md
-- **What:** ... (origin.startsWith("http://localhost") || origin.startsWith("https://")) ...
-... any request with an `Origin` starting with `https://` gets that origin reflected ...
-```
-
-**Why this matters:**
-Stale security documentation can be as harmful as missing documentation: it misguides reviewers and operators about the system’s actual exposure.
-
----
-
-### [LOW] Finding #13: Test fixture includes a real PEM private key committed to the repository
-
-**File:** `apps/api/tests/fixtures/apple-test-key.pem`  
-**Lines:** 1-5  
-**Category:** slop
-
-**Description:**
-A PEM-formatted EC private key is checked in as a test fixture. Even if intended to be non-production, it is still private key material present in the repo.
-
-**Code:**
-```text
------BEGIN PRIVATE KEY-----
-MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg...
------END PRIVATE KEY-----
-```
-
-**Why this matters:**
-Key material in-repo is a high-risk pattern if it ever gets reused outside tests or mistaken for a real credential.
-
----
-
-### [LOW] Finding #14: Redundant status assignment suggests copy/paste and makes route logic harder to trust
-
-**File:** `apps/web/src/app/api/setlist/proxy/route.ts`  
-**Lines:** 22-25  
-**Category:** slop
-
-**Description:**
-`status` is assigned via a conditional that returns the same value on both branches. This looks like leftover scaffolding and increases the chance future edits accidentally introduce divergence.
-
-**Code:**
-```ts
-const status = "error" in result ? result.status : result.status;
-```
-
-**Why this matters:**
-Small “slop” in API glue code tends to accumulate and becomes a source of subtle regressions.
-
----
-
-### [HIGH] Finding #15: CORS headers are the only “restriction”; endpoints still return tokens/data to any caller (CORS is not server-side access control)
+### [LOW] Finding #14: Dev-token error responses omit the explicit no-cache headers applied on success
 
 **File:** `apps/web/src/app/api/apple/dev-token/route.ts`  
-**Lines:** 9-16  
+**Lines:** 9-23  
 **Category:** will-break
 
 **Description:**
-The dev-token route always returns the token payload (or error payload) to the requester. There is no server-side authorization check based on `Origin` (or any other credential). The only “restriction” in this layer is adding `Access-Control-Allow-Origin` via `corsHeaders(request)`, which only affects whether **browsers** expose the response to JS. Non-browser clients (curl, bots, server scripts) can call the endpoint and receive the response regardless of CORS headers. The same applies to the setlist proxy route (`apps/web/src/app/api/setlist/proxy/route.ts:13-30`).
+On the success path, the handler sets `Cache-Control: no-store` and `Pragma: no-cache`. On the exception path, it returns a 500 with `corsHeaders(request)` only (no explicit cache headers). Depending on intermediaries, error responses could be cached differently than intended.
 
 **Code:**
 ```ts
-export async function GET(request: NextRequest) {
-  const result = await handleDevToken();
-  const status = "error" in result ? 503 : 200;
-  return new Response(JSON.stringify(result), {
-    status,
-    headers: corsHeaders(request),
-  });
+try {
+  ...
+  headers["Cache-Control"] = "no-store";
+  headers["Pragma"] = "no-cache";
+  return new Response(JSON.stringify(result), { status, headers });
+} catch {
+  const headers = corsHeaders(request) as Record<string, string>;
+  return new Response(
+    JSON.stringify({ error: "An unexpected error occurred. Please try again." }),
+    { status: 500, headers }
+  );
 }
 ```
 
 **Why this matters:**
-Relying on CORS alone does not prevent token/proxy abuse by non-browser clients, and can create a false sense of protection in deployment/security reviews.
+Inconsistent caching behavior around sensitive endpoints increases operational confusion and can worsen incident recovery (clients seeing cached failures).
+
+---

@@ -1,30 +1,30 @@
-# App Pages & Layout Deep Audit Findings
+# App Pages & Layout Findings
 
-Audit Date: 2026-02-14  
-Files Examined: 5  
-Total Findings: 8
+Audit Date: 2026-02-15T07:19:27Z  
+Files Examined: 4  
+Total Findings: 12
 
 ## Summary by Severity
 - Critical: 0
 - High: 2
-- Medium: 4
-- Low: 2
+- Medium: 6
+- Low: 4
 
 ---
 
 ## Findings
 
-### HIGH Finding #1: Root error boundary shows raw `error.message` (user-visible internal details)
+### [HIGH] Finding #1: Route error boundary displays raw `error.message` to users (information disclosure)
 
 **File:** `apps/web/src/app/error.tsx`  
 **Lines:** 16-23  
 **Category:** will-break
 
 **Description:**
-The root segment error UI derives `message` from `error.message` and renders it directly. While this is helpful in development, it makes the production UX dependent on the exact text of thrown errors. Any internal error message content (API responses, implementation details, environment/config hints, stack-adjacent messaging, etc.) becomes user-visible.
+The route-level error UI renders `error.message` directly into the page. This can disclose internal implementation details (upstream error strings, internal route names, stack-adjacent messages, misconfiguration hints) to end users.
 
 **Code:**
-```typescript
+```tsx
 const message = error instanceof Error ? error.message : String(error ?? "Unknown error");
 
 <p style={{ color: "#666", marginTop: "0.5rem" }}>
@@ -33,42 +33,21 @@ const message = error instanceof Error ? error.message : String(error ?? "Unknow
 ```
 
 **Why this matters:**
-User-visible internal error strings can leak debugging details and can confuse users with non-actionable text.
+Error messages often contain internal details not intended for end users; displaying them increases the blast radius of otherwise recoverable failures.
 
 ---
 
-### MEDIUM Finding #2: Root error boundary logs the full error object to the browser console
-
-**File:** `apps/web/src/app/error.tsx`  
-**Lines:** 12-14  
-**Category:** will-break
-
-**Description:**
-The error boundary unconditionally logs the full error object via `console.error`. In client-rendered contexts, this can expose stack traces and error details to end users in DevTools and increases the chance of accidentally surfacing sensitive operational details during incident scenarios.
-
-**Code:**
-```typescript
-useEffect(() => {
-  console.error(error);
-}, [error]);
-```
-
-**Why this matters:**
-Console logs are a common leakage channel for internal details and are noisy in production debugging (especially when errors are triggered repeatedly).
-
----
-
-### HIGH Finding #3: Global error boundary shows raw `error.message` (user-visible internal details)
+### [HIGH] Finding #2: Global error boundary displays raw `error.message` to users (information disclosure)
 
 **File:** `apps/web/src/app/global-error.tsx`  
 **Lines:** 10-19  
 **Category:** will-break
 
 **Description:**
-Like `error.tsx`, the global error UI renders `error.message` directly. Since `global-error.tsx` is the catch-all boundary that replaces the root layout when active, this increases the likelihood that low-level root failures (including config/env-related failures) present internal messaging to users.
+The global error UI also renders `error.message` directly. Global errors commonly come from root layout / framework-level failures, where messages are more likely to include internal details.
 
 **Code:**
-```typescript
+```tsx
 const message = error instanceof Error ? error.message : String(error ?? "Unknown error");
 
 <p style={{ color: "#666", marginTop: "0.5rem" }}>
@@ -77,72 +56,61 @@ const message = error instanceof Error ? error.message : String(error ?? "Unknow
 ```
 
 **Why this matters:**
-Global errors are often the most sensitive/least user-actionable failures; exposing raw messages is a high-risk UX and information-disclosure pattern.
+When the root crashes, users can see sensitive operational detail at the exact moment the app is least controlled.
 
 ---
 
-### MEDIUM Finding #4: `global-error.tsx` does not include global dependencies (styles/head/title) even though it replaces the root layout
+### [MEDIUM] Finding #3: Error-message extraction relies on `instanceof Error`, risking poor/incorrect user output
 
-**File:** `apps/web/src/app/global-error.tsx`  
-**Lines:** 13-35  
+**File:** `apps/web/src/app/error.tsx`  
+**Lines:** 16-16  
 **Category:** will-break
 
 **Description:**
-`global-error.tsx` returns `<html>`/`<body>` (required), but does not include a `<head>` section, `<title>`, or any imported global CSS that the normal app layout relies on (`apps/web/src/app/layout.tsx` imports global styles and injects `<meta name="theme-color">` and the MusicKit `<Script>`). Next.js explicitly notes that global error UI must define its own global styles/fonts/dependencies because it replaces the root layout when active, and that metadata exports are not supported for global error boundaries (use a `<title>` element instead).
+The UI assumes `error` is an `Error` instance at runtime and falls back to `String(error)` otherwise. If `error` is not a real `Error` instance (e.g., unusual serialization/transport cases or non-Error throws), `String(error)` can render as `"[object Object]"`, creating an unhelpful and confusing error display.
 
 **Code:**
-```typescript
-return (
-  <html lang="en">
-    <body>
-      <main style={{ padding: "2rem", maxWidth: "40rem", margin: "0 auto", fontFamily: "system-ui, sans-serif" }}>
-        <h1>Something went wrong</h1>
-        ...
-      </main>
-    </body>
-  </html>
-);
+```tsx
+const message = error instanceof Error ? error.message : String(error ?? "Unknown error");
 ```
 
 **Why this matters:**
-When the global error boundary is shown, the page can lose expected global styling/branding and document metadata (title/theme color), making the failure mode look broken/untrusted and harder for users to understand.
+In the worst failure modes, the app’s last-resort UI can become uninformative (or misleading), reducing the chance users can recover.
 
 ---
 
-### MEDIUM Finding #5: Root layout hard-depends on a third-party CDN script with no failure handling
+### [MEDIUM] Finding #4: Client-side logging of full error object can leak internals in production consoles
 
-**File:** `apps/web/src/app/layout.tsx`  
-**Lines:** 22-27  
+**File:** `apps/web/src/app/error.tsx`  
+**Lines:** 12-14  
 **Category:** will-break
 
 **Description:**
-The app injects Apple MusicKit JS from Apple’s CDN using `strategy="beforeInteractive"`. There is no visible handling for script load failure or degraded behavior at the layout level (no onError, no fallback UI, no “script unavailable” state). If the CDN is blocked/unreachable, any downstream code depending on MusicKit availability can fail in ways that may cascade into the error boundaries.
+The route error boundary logs the full `error` object to the browser console for every error render. Depending on how errors are created/thrown, this can include stacks, nested causes, or other internal details.
 
 **Code:**
-```typescript
-<Script
-  src="https://js-cdn.music.apple.com/musickit/v3/musickit.js"
-  strategy="beforeInteractive"
-  crossOrigin="anonymous"
-/>
+```tsx
+useEffect(() => {
+  console.error(error);
+}, [error]);
 ```
 
 **Why this matters:**
-This creates a single point of failure outside your infrastructure and increases the chance of “blank/failed app” experiences in restrictive networks.
+Browser consoles are user-accessible; logging detailed errors increases inadvertent disclosure and can create noisy diagnostics in real user sessions.
 
 ---
 
-### MEDIUM Finding #6: Home page describes a 4-step flow but only wires a single feature component at the route level
+### [MEDIUM] Finding #5: Homepage copy promises a 4-step flow, but app-level wiring only renders the import feature
 
 **File:** `apps/web/src/app/page.tsx`  
-**Lines:** 12-28  
+**Lines:** 12-27  
 **Category:** unfinished
 
 **Description:**
-The root page presents an ordered list implying distinct stages (“Import”, “Preview”, “Matching”, “Export”), but the route-level wiring only renders `SetlistImportView` with no explicit page-level composition for preview/matching/export. This makes the “flow wiring” correctness entirely implicit and dependent on what `SetlistImportView` does internally, and the page text can drift from actual behavior without any route-level structure enforcing the stages.
+The page presents an explicit “Import → Preview → Matching → Export” flow, but at the app-route level it only renders `SetlistImportView`. There is no top-level composition that visibly wires “matching” or “export” into the route. If those steps exist, they’re hidden behind (and coupled to) the import feature; if they don’t, the page copy is misleading.
 
 **Code:**
-```typescript
+```tsx
 <ol style={{ marginTop: "1.5rem", paddingLeft: "1.5rem" }}>
   <li><strong>Import</strong> – Enter setlist.fm URL or ID</li>
   <li><strong>Preview</strong> – See artist, venue, date, and track list</li>
@@ -153,67 +121,170 @@ The root page presents an ordered list implying distinct stages (“Import”, �
 ```
 
 **Why this matters:**
-If the internal feature orchestration changes or is incomplete, users may have no clear way to complete the intended import → match → export journey.
+Mismatch between stated flow and route composition is a common source of user confusion and makes “where does matching/export live?” hard to reason about during maintenance.
 
 ---
 
-### LOW Finding #7: Theme color is inconsistent between HTML meta and the PWA manifest
+### [MEDIUM] Finding #6: No route-level loading boundary or explicit loading UI at the app-page/layout layer
+
+**File:** `apps/web/src/app/page.tsx`  
+**Lines:** 3-28  
+**Category:** will-break
+
+**Description:**
+The root route renders a feature component directly with no Suspense boundary or app-page-level loading UI. If the user experience depends on async work (fetching setlists, preparing preview state, initializing MusicKit authorization flows, etc.), the route-level UX can degrade into abrupt content jumps or “nothing happens” periods, depending on how nested components behave.
+
+**Code:**
+```tsx
+export default function HomePage() {
+  return (
+    <main style={{ padding: "2rem", maxWidth: "40rem", margin: "0 auto", minWidth: 0 }}>
+      ...
+      <SetlistImportView />
+    </main>
+  );
+}
+```
+
+**Why this matters:**
+Without a route-level loading experience, failures and latency tend to present as confusing UI stalls, especially on cold loads or slow networks.
+
+---
+
+### [MEDIUM] Finding #7: Root layout unconditionally loads third-party MusicKit script with `beforeInteractive` (perf/availability risk; potential “layout flash”)
 
 **File:** `apps/web/src/app/layout.tsx`  
-**Lines:** 18-20  
-**Category:** slop
+**Lines:** 22-27  
+**Category:** will-break
 
 **Description:**
-The root layout sets `theme-color` to `#1a1a1a`, but the referenced manifest defines `theme_color` as `#000000` (and `background_color` as `#ffffff`). This mismatch can lead to inconsistent browser UI tinting (tab/address bar) vs installed-PWA theming.
+The root layout loads MusicKit from Apple’s CDN on every page view and does so using `strategy="beforeInteractive"`. This can increase the critical path (network dependency before interactivity) and makes core UX dependent on third-party script availability even when the current screen may not yet need MusicKit.
 
 **Code:**
-```typescript
-<head>
-  <meta name="theme-color" content="#1a1a1a" />
-</head>
-```
-
-**File:** `apps/web/public/manifest.webmanifest`  
-**Lines:** 6-9  
-**Category:** slop
-
-**Code:**
-```json
-"display": "standalone",
-"background_color": "#ffffff",
-"theme_color": "#000000",
-"icons": [
+```tsx
+<Script
+  src="https://js-cdn.music.apple.com/musickit/v3/musickit.js"
+  strategy="beforeInteractive"
+  crossOrigin="anonymous"
+/>
 ```
 
 **Why this matters:**
-Inconsistent theme colors create subtle but noticeable polish issues and can contribute to perceived “flash” or mismatched UI chrome across contexts.
+If the script is slow/blocked/unavailable, the app can feel broken (slow first load, delayed interactivity), and the user may perceive flicker/late initialization effects around MusicKit-dependent UI.
 
 ---
 
-### LOW Finding #8: Error UIs are duplicated with minor divergences (drift risk)
+### [MEDIUM] Finding #8: Global error UI bypasses root layout head/styles (unstyled/inconsistent crash experience)
+
+**File:** `apps/web/src/app/global-error.tsx`  
+**Lines:** 13-34  
+**Category:** will-break
+
+**Description:**
+The global error component returns its own `<html>`/`<body>` without any `<head>` content and without importing global CSS. This means that on a global crash, users will likely see a different (unstyled or partially styled) experience than the rest of the app, and layout-level metadata (theme-color meta, manifest link generation behavior, etc.) won’t apply consistently during the failure state.
+
+**Code:**
+```tsx
+return (
+  <html lang="en">
+    <body>
+      <main style={{ padding: "2rem", maxWidth: "40rem", margin: "0 auto", fontFamily: "system-ui, sans-serif" }}>
+        ...
+      </main>
+    </body>
+  </html>
+);
+```
+
+**Why this matters:**
+Global failures are already high-friction; inconsistent styling/metadata makes recovery and user trust worse at the exact moment reliability is being tested.
+
+---
+
+### [LOW] Finding #9: Root layout mixes `metadata` API with manual `<head>` markup (risk of drift/duplication)
+
+**File:** `apps/web/src/app/layout.tsx`  
+**Lines:** 5-20  
+**Category:** slop
+
+**Description:**
+The layout uses the `metadata` export (title/description/manifest) but also manually injects `<head>` with a theme-color meta tag. This split increases the risk that head concerns drift over time (e.g., some head tags managed in `metadata`, others manually), and can lead to duplication if theme/viewport metadata is later added via Next’s metadata APIs.
+
+**Code:**
+```tsx
+export const metadata: Metadata = {
+  title: "Setlist to Playlist",
+  description: "Import a setlist from setlist.fm and create an Apple Music playlist.",
+  manifest: "/manifest.webmanifest",
+};
+
+<html lang="en">
+  <head>
+    <meta name="theme-color" content="#1a1a1a" />
+  </head>
+```
+
+**Why this matters:**
+Head management is a cross-cutting concern; splitting patterns at the root increases maintenance risk and makes regressions more likely.
+
+---
+
+### [LOW] Finding #10: Error boundary types include `digest` but the UI ignores it entirely (reduced diagnosability)
 
 **File:** `apps/web/src/app/error.tsx`  
-**Lines:** 18-37  
-**Category:** slop
+**Lines:** 9-10  
+**Category:** unfinished
 
 **Description:**
-`error.tsx` and `global-error.tsx` implement nearly the same UI (heading, message paragraph, “Try again” button) with slight style differences (e.g., `global-error.tsx` sets `fontFamily` inline; `error.tsx` does not). This duplication increases the chance of inconsistent user experience and future drift.
+The `error` type includes an optional `digest`, but the component neither displays it nor uses it for correlation. This appears to be an unused capability and can make debugging production-only failures harder.
 
 **Code:**
-```typescript
-<main style={{ padding: "2rem", maxWidth: "40rem", margin: "0 auto" }}>
-  <h1>Something went wrong</h1>
-  ...
-  <button type="button" onClick={reset}>Try again</button>
-</main>
+```tsx
+error: Error & { digest?: string };
 ```
 
 **Why this matters:**
-Duplicated error UI tends to diverge over time, especially as branding, accessibility, and messaging evolve.
+When errors are intermittent, having a stable identifier (when available) can be important for triage and support workflows.
 
 ---
 
-## External References
+### [LOW] Finding #11: Extensive inline styling in the root page suggests placeholder/prototype-level presentation
 
-- Next.js Docs — “Routing: Error Handling” (global-error replaces root layout; must define `<html>`/`<body>`): https://nextjs.org/docs/13/app/building-your-application/routing/error-handling (accessed 2026-02-14)
-- Next.js Docs — “File-system conventions: `error.js` / `global-error`” (global error UI must include global styles/dependencies; metadata not supported; use `<title>`): https://nextjs.org/docs/app/api-reference/file-conventions/error (accessed 2026-02-14)
+**File:** `apps/web/src/app/page.tsx`  
+**Lines:** 5-26  
+**Category:** stub
+
+**Description:**
+The main page UI is primarily styled via inline style objects (layout sizing, spacing, list indentation). This looks like scaffolding/prototype UI rather than a cohesive layout system, and makes consistent theming and reuse harder.
+
+**Code:**
+```tsx
+<main style={{ padding: "2rem", maxWidth: "40rem", margin: "0 auto", minWidth: 0 }}>
+...
+<ol style={{ marginTop: "1.5rem", paddingLeft: "1.5rem" }}>
+```
+
+**Why this matters:**
+Inline styles tend to accrete and diverge across pages, which increases UI inconsistency and makes global changes harder.
+
+---
+
+### [LOW] Finding #12: Minor UI slop in global error reset handler (unnecessary wrapper)
+
+**File:** `apps/web/src/app/global-error.tsx`  
+**Lines:** 20-23  
+**Category:** slop
+
+**Description:**
+The reset handler is wrapped in an arrow function even though `reset` already matches the expected callback signature.
+
+**Code:**
+```tsx
+<button
+  type="button"
+  onClick={() => reset()}
+>
+```
+
+**Why this matters:**
+Minor, but it’s a sign of inconsistent patterns and adds small avoidable noise in the most critical fallback UI.

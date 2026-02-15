@@ -1,27 +1,74 @@
 # setlist.fm Proxy Deep Audit Findings
 
-Audit Date: 2026-02-14  
-Files Examined: 7  
-Total Findings: 16  
+Audit Date: 2026-02-15  
+Files Examined: 4  
+Total Findings: 11
 
 ## Summary by Severity
 - Critical: 0
-- High: 4
-- Medium: 8
-- Low: 4
+- High: 3
+- Medium: 6
+- Low: 2
 
 ---
 
 ## Findings
 
-### [HIGH] Finding #1: In-memory cache can grow without bound (memory/DoS risk)
+### [HIGH] Finding #1: Public proxy can be abused to drain `SETLISTFM_API_KEY` quota (CORS is not access control)
 
-**File:** `apps/api/src/lib/setlistfm.ts`  
-**Lines:** 36-65  
+**File:** `apps/web/src/app/api/setlist/proxy/route.ts`  
+**Lines:** 11-44  
 **Category:** will-break
 
 **Description:**
-The proxy caches successful setlist responses in a module-level `Map`. While there is a TTL and an “evict expired” pass, there is **no maximum cache size** and eviction only removes *expired* entries. Under steady traffic with many unique setlist IDs within the TTL window, the cache can grow indefinitely.
+This is a public, unauthenticated GET endpoint that triggers server-side calls to setlist.fm using the server’s `SETLISTFM_API_KEY` (via `handleSetlistProxy`). The only “restriction” visible here is CORS response headers, but CORS only affects whether browser JavaScript can read the response. Any non-browser client (curl, bots, server-to-server) can call this endpoint directly and force upstream requests, consuming rate limits/quota and potentially causing service degradation.
+
+**Code:**
+```ts
+export async function GET(request: NextRequest) {
+  const id = request.nextUrl.searchParams.get("id") ?? request.nextUrl.searchParams.get("url") ?? "";
+  // ...
+  const result = await handleSetlistProxy(id);
+  // ...
+  return new Response(JSON.stringify(body), { status, headers: corsHeaders(request) });
+}
+```
+
+**Why this matters:**
+Even if browser cross-origin reads are blocked, the server still performs the upstream call. This enables trivial automated abuse that burns the API key’s allowance and can cascade into 429s and user-visible failures.
+
+---
+
+### [HIGH] Finding #2: Upstream fetch has no timeout/abort; requests can hang and tie up server resources
+
+**File:** `apps/api/src/lib/setlistfm.ts`  
+**Lines:** 92-125  
+**Category:** will-break
+
+**Description:**
+`fetchSetlistFromApi` calls `fetch()` without any timeout/abort. Network stalls (DNS issues, upstream hangs, partial connectivity) can lead to long-running requests. Because this runs in an API route path, hung upstream calls can accumulate under load, consuming runtime resources and causing cascading latency/failures.
+
+**Code:**
+```ts
+for (let attempt = 0; attempt <= MAX_RETRIES_429; attempt++) {
+  const res = await fetch(url, { headers });
+  // ...
+}
+```
+
+**Why this matters:**
+In production, transient upstream/network issues are normal. Without a bounded request time, the proxy can become a bottleneck and amplify outages.
+
+---
+
+### [HIGH] Finding #3: “Cache eviction threshold” does not cap cache size; memory can grow unbounded within TTL window
+
+**File:** `apps/api/src/lib/setlistfm.ts`  
+**Lines:** 38-67  
+**Category:** will-break
+
+**Description:**
+The cache only evicts *expired* entries when `cache.size > CACHE_EVICT_THRESHOLD`. If an attacker (or heavy usage) requests many unique setlist IDs within the 1-hour TTL, none expire, so `evictExpired()` deletes nothing and the `Map` continues growing without bound. The threshold reduces eviction frequency but does not enforce a maximum size.
 
 **Code:**
 ```ts
@@ -29,15 +76,6 @@ const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const cache = new Map<string, { body: unknown; expires: number }>();
 
 const CACHE_EVICT_THRESHOLD = 200;
-
-function evictExpired(): void {
-  const now = Date.now();
-  const toDelete: string[] = [];
-  for (const [key, entry] of cache.entries()) {
-    if (now > entry.expires) toDelete.push(key);
-  }
-  toDelete.forEach((k) => cache.delete(k));
-}
 
 function setCached(id: string, body: unknown): void {
   cache.set(id, { body, expires: Date.now() + CACHE_TTL_MS });
@@ -48,140 +86,116 @@ function setCached(id: string, body: unknown): void {
 ```
 
 **Why this matters:**
-A public-facing proxy endpoint can be driven with many unique IDs (valid-looking or random). Unbounded growth increases memory pressure and can crash long-lived processes or degrade performance.
+A simple high-cardinality request pattern can cause steady memory growth, leading to process instability or crashes.
 
 ---
 
-### [HIGH] Finding #2: Network/`fetch()` failures are not handled (unhandled exception path)
+### [MEDIUM] Finding #4: Host validation contradicts comment; `includes("setlist.fm")` accepts lookalike domains
 
 **File:** `apps/api/src/lib/setlistfm.ts`  
-**Lines:** 74-123  
-**Category:** will-break
+**Lines:** 15-16  
+**Category:** broken-logic
 
 **Description:**
-`fetchSetlistFromApi` directly awaits `fetch(url, { headers })` without any try/catch. If DNS fails, the network is down, TLS errors occur, or the runtime aborts the request, `fetch()` can reject and **throw out of the function**, bypassing the structured `{ ok: false, status, message }` return type.
+The comment says “only accept URLs whose host is setlist.fm”, but the implementation uses substring matching on hostname. This accepts hosts like `evilsetlist.fm` or `setlist.fm.evil.com`, which are not setlist.fm.
 
 **Code:**
 ```ts
-for (let attempt = 0; attempt <= MAX_RETRIES_429; attempt++) {
-  const res = await fetch(url, { headers });
-  lastStatus = res.status;
-  // ...
+// only accept URLs whose host is setlist.fm ...
+if (!url.hostname.toLowerCase().includes("setlist.fm")) return null;
+```
+
+**Why this matters:**
+This is a correctness/security footgun: the parser claims to enforce strict host checks but does not. Even though the current code only extracts an ID (and later fetches a fixed setlist.fm API base), the mismatch invites future unsafe reuse and can accept misleading inputs.
+
+---
+
+### [MEDIUM] Finding #5: Setlist ID validation is inconsistent and overly permissive (e.g., accepts all-hyphen “IDs”)
+
+**File:** `apps/api/src/lib/setlistfm.ts`  
+**Lines:** 18-35  
+**Category:** broken-logic
+
+**Description:**
+The parser uses multiple, inconsistent acceptance rules:
+- URL regex accepts 4–12 hex chars (`[a-f0-9]{4,12}`).
+- Raw ID accepts 4–64 chars of `[a-f0-9-]`, which includes values like `"----"` (no hex digits at all).
+- A fallback returns `withoutHtml` if it matches `^[a-f0-9-]+$` with no length constraints, potentially returning nonsense.
+
+These rules can produce false positives (treat invalid input as an ID), resulting in confusing downstream errors and extra upstream calls.
+
+**Code:**
+```ts
+const match = path.match(/-([a-f0-9]{4,12})\.html$/i);
+// ...
+if (withoutHtml && /^[a-f0-9-]+$/i.test(withoutHtml)) return withoutHtml;
+// ...
+if (/^[a-f0-9-]{4,64}$/i.test(trimmed)) return trimmed;
+```
+
+**Why this matters:**
+Loose parsing increases unexpected 404s/429s and makes it harder to reason about input validity and error reporting.
+
+---
+
+### [MEDIUM] Finding #6: Upstream error message forwarding can leak raw upstream content (JSON/HTML) to clients
+
+**File:** `apps/api/src/lib/setlistfm.ts`  
+**Lines:** 111-117  
+**Category:** will-break
+
+**Description:**
+On non-OK responses, the code reads the entire response body as text and tries to parse JSON. If parsing succeeds but the JSON does not have a top-level `message`, it falls back to `text`, which is the full response payload. That payload then becomes `result.message` and is returned to clients (truncated later, but still raw upstream content).
+
+**Code:**
+```ts
+const text = await res.text();
+try {
+  const json = JSON.parse(text) as { message?: string };
+  lastMessage = json.message ?? (text || res.statusText);
+} catch {
+  lastMessage = text || res.statusText;
 }
 ```
 
 **Why this matters:**
-Unhandled rejections can bubble up to the route handler and result in generic 500 responses, inconsistent JSON shapes, and missing CORS headers (see related findings).
+This can expose upstream error formats/details directly to the frontend (including markup). If the frontend ever renders this unsafely, it can become an injection vector; even when rendered safely, it can leak implementation details and confuse users.
 
 ---
 
-### [HIGH] Finding #3: `handleSetlistProxy` does not guard against exceptions from the fetch layer
+### [MEDIUM] Finding #7: Proxy forwards upstream error strings to clients with minimal sanitization
 
 **File:** `apps/api/src/routes/setlist/proxy.ts`  
-**Lines:** 30-34  
+**Lines:** 38-46  
 **Category:** will-break
 
 **Description:**
-`handleSetlistProxy` awaits `fetchSetlistFromApi` without try/catch. Any exception thrown by `fetchSetlistFromApi` (notably network `fetch()` rejections) will escape and crash the handler’s control flow.
+`handleSetlistProxy` truncates error strings to 500 chars but otherwise forwards upstream-derived messages. Combined with the upstream behavior in `fetchSetlistFromApi`, this means end users can receive arbitrary upstream text/JSON/HTML fragments.
 
 **Code:**
 ```ts
-const result = await fetchSetlistFromApi(setlistId, apiKey);
+const MAX_ERROR_MESSAGE_LENGTH = 500;
+const message =
+  typeof result.message === "string" && result.message.length > MAX_ERROR_MESSAGE_LENGTH
+    ? result.message.slice(0, MAX_ERROR_MESSAGE_LENGTH) + "…"
+    : result.message;
 
-if (result.ok) {
-  return { body: result.body, status: 200 };
-}
+return { error: message, status };
 ```
 
 **Why this matters:**
-Even if most upstream failures are represented as HTTP statuses, real-world transient failures often manifest as thrown exceptions. This produces inconsistent behavior and error responses.
+Even truncated, returning raw upstream content is a common source of confusing UX and accidental information disclosure.
 
 ---
 
-### [HIGH] Finding #4: Next.js route handler does not guard against thrown errors; failure responses may be non-JSON and lack CORS headers
-
-**File:** `apps/web/src/app/api/setlist/proxy/route.ts`  
-**Lines:** 13-29  
-**Category:** will-break
-
-**Description:**
-The route handler directly awaits `handleSetlistProxy(id)` and then `JSON.stringify(body)` without try/catch. If `handleSetlistProxy` throws (see findings #2–#3) or if serialization throws, Next.js will generate a generic error response outside the handler’s explicit `corsHeaders(request)` usage.
-
-**Code:**
-```ts
-export async function GET(request: NextRequest) {
-  // ...
-  const result = await handleSetlistProxy(id);
-  const body = "error" in result ? { error: result.error } : result.body;
-
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: corsHeaders(request),
-  });
-}
-```
-
-**Why this matters:**
-Browser clients can see opaque “CORS error” failures when the server emits an unhandled 500 without `Access-Control-Allow-Origin`, making incidents harder to diagnose and breaking UX.
-
----
-
-### [MEDIUM] Finding #5: 429 retry/backoff is fixed and ignores upstream pacing signals; can amplify traffic during rate limiting
+### [MEDIUM] Finding #8: No response-shape validation; `unknown` is passed through end-to-end
 
 **File:** `apps/api/src/lib/setlistfm.ts`  
-**Lines:** 67-131  
+**Lines:** 72-75, 96-109  
 **Category:** will-break
 
 **Description:**
-On HTTP 429, the proxy retries up to `MAX_RETRIES_429` with a fixed, linear backoff and does not consult any response headers (e.g. a `Retry-After` value, if present). During a rate-limit event, this pattern can increase request volume (multiple attempts per client request) and prolong rate limiting.
-
-**Code:**
-```ts
-const MAX_RETRIES_429 = 2;
-const BACKOFF_MS = 1000;
-
-if (res.status === 429 && attempt < MAX_RETRIES_429) {
-  await new Promise((r) => setTimeout(r, BACKOFF_MS * (attempt + 1)));
-  continue;
-}
-```
-
-**Why this matters:**
-Rate limits are typically a system-wide constraint. Retrying without coordinating on server-provided guidance can worsen the condition and cause more user-visible failures.
-
----
-
-### [MEDIUM] Finding #6: Cache does not deduplicate concurrent in-flight requests for the same ID
-
-**File:** `apps/api/src/lib/setlistfm.ts`  
-**Lines:** 78-107  
-**Category:** will-break
-
-**Description:**
-If multiple requests for the same `setlistId` arrive concurrently, both can observe a cache miss and proceed to call the upstream API before the first response populates the cache. There is no in-flight promise registry / request coalescing.
-
-**Code:**
-```ts
-const cached = getCached(setlistId);
-if (cached !== null) return { ok: true, body: cached };
-
-// upstream fetch happens after this point
-const res = await fetch(url, { headers });
-```
-
-**Why this matters:**
-This reduces the practical value of caching under load and can contribute to hitting 429 rate limits faster.
-
----
-
-### [MEDIUM] Finding #7: Proxy returns and caches `unknown` without validating response shape or size
-
-**File:** `apps/api/src/lib/setlistfm.ts`  
-**Lines:** 70-107  
-**Category:** will-break
-
-**Description:**
-The upstream JSON is treated as `unknown`, cached as-is, and returned to the caller with no runtime validation (shape, required fields, or size constraints). The cache will store whatever JSON is returned on `res.ok`, including unexpected shapes.
+Successful responses are typed as `unknown`, cached as `unknown`, and returned as-is. No runtime validation ensures the payload actually matches the expected setlist.fm “setlist” shape. If setlist.fm returns a partial payload, an error payload with 200 status, or an unexpected structure, downstream code may break or show incorrect data.
 
 **Code:**
 ```ts
@@ -196,124 +210,86 @@ return { ok: true, body };
 ```
 
 **Why this matters:**
-Downstream code can implicitly assume certain fields exist and fail at runtime. Caching also increases blast radius if the upstream returns an unexpectedly large payload.
+This makes the system fragile to upstream changes and unusual edge responses, and it can turn upstream anomalies into hard-to-debug client issues.
 
 ---
 
-### [MEDIUM] Finding #8: URL/ID parsing rules are inconsistent and hardcoded; documented intent conflicts with implementation details
+### [MEDIUM] Finding #9: 429 handling is simplistic; no use of server guidance headers and no global throttling
 
 **File:** `apps/api/src/lib/setlistfm.ts`  
-**Lines:** 3-33  
-**Category:** broken-logic
+**Lines:** 69-133  
+**Category:** will-break
 
 **Description:**
-`parseSetlistIdFromInput` mixes multiple parsing strategies with different constraints:
-- URL parsing primarily extracts `-[a-f0-9]{4,12}.html` or validates `idPart` as `{4,12}` hex.
-- Raw ID parsing accepts `{4,64}` characters, but still restricted to `[a-f0-9-]` despite the comment stating “alphanumeric”.
-
-This creates inconsistent acceptance rules between URL-derived IDs and direct IDs, and the comments do not match the actual regex constraints.
+The retry loop uses a fixed backoff schedule (1s, 2s) with a small retry count and does not consider any response headers that might guide retry timing (if present). It also retries per-request without any shared throttling, so concurrent bursts can repeatedly hit 429 and multiply load.
 
 **Code:**
 ```ts
-// e.g. /setlist/.../63de4613.html or .../abc1.html (DCI-005: allow 4-12 hex chars)
-const match = path.match(/-([a-f0-9]{4,12})\.html$/i);
+const MAX_RETRIES_429 = 2;
+const BACKOFF_MS = 1000;
 
-// raw ID (alphanumeric, possibly with hyphens)
-if (/^[a-f0-9-]{4,64}$/i.test(trimmed)) return trimmed;
-```
-
-**Why this matters:**
-Inconsistent parsing rules can cause confusing “invalid ID/URL” errors for some real-world inputs and make behavior differ depending on whether a user pastes a URL or an ID.
-
----
-
-### [MEDIUM] Finding #9: URL parsing does not verify hostname or path category; may extract IDs from non-setlist pages/hosts
-
-**File:** `apps/api/src/lib/setlistfm.ts`  
-**Lines:** 8-29  
-**Category:** broken-logic
-
-**Description:**
-The “URL mode” triggers when the input contains `setlist.fm`, even if it is not a canonical setlist URL, and does not validate `url.hostname` or that `url.pathname` is actually a setlist page. Any pathname ending with `-<hex>.html` can yield an ID.
-
-**Code:**
-```ts
-if (
-  trimmed.startsWith("http://") ||
-  trimmed.startsWith("https://") ||
-  trimmed.includes("setlist.fm")
-) {
-  const url = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
-  const path = url.pathname;
-  const match = path.match(/-([a-f0-9]{4,12})\.html$/i);
-  if (match) return match[1];
-  // ...
+if (res.status === 429 && attempt < MAX_RETRIES_429) {
+  await new Promise((r) => setTimeout(r, BACKOFF_MS * (attempt + 1)));
+  continue;
 }
 ```
 
 **Why this matters:**
-Users can paste other setlist.fm pages (or lookalike domains) that happen to end in a similar pattern and get an extracted ID that leads to a confusing 404 from the API, masking the true input problem.
+Under bursty traffic, this approach can increase latency, waste retries, and amplify rate-limit lockouts.
 
 ---
 
-### [MEDIUM] Finding #10: Upstream error messages are reflected to clients (truncated but otherwise unsanitized)
+### [MEDIUM] Finding #10: Cache can serve stale setlist data despite API being “current version”; no cache-bypass mechanism
 
-**File:** `apps/api/src/routes/setlist/proxy.ts`  
-**Lines:** 36-46  
+**File:** `apps/api/src/lib/setlistfm.ts`  
+**Lines:** 38-48, 80-82  
 **Category:** will-break
 
 **Description:**
-When upstream responses are non-2xx, the proxy forwards `result.message` back to the client (capped at 500 chars). The message content is derived from upstream body text/JSON and can include HTML, internal phrasing, or other details not meant for end users.
+The implementation caches setlist responses for 1 hour and always serves cached results when present. The setlist.fm API endpoint explicitly returns the “current version” of a setlist (which can change if edited), but this proxy can serve up to 1 hour of stale data with no bypass/refresh path.
 
 **Code:**
 ```ts
-const MAX_ERROR_MESSAGE_LENGTH = 500;
-const message =
-  typeof result.message === "string" && result.message.length > MAX_ERROR_MESSAGE_LENGTH
-    ? result.message.slice(0, MAX_ERROR_MESSAGE_LENGTH) + "…"
-    : result.message;
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
-return { error: message, status };
+const cached = getCached(setlistId);
+if (cached !== null) return { ok: true, body: cached };
 ```
 
 **Why this matters:**
-This can leak upstream implementation details into client-visible responses and creates inconsistent UX because error strings depend on upstream formatting.
+Users may see outdated setlist contents (tracks/ordering) after edits on setlist.fm, and the behavior will be inconsistent across instances (in-memory per process).
 
 ---
 
-### [MEDIUM] Finding #11: Query param selection bug when `id` is present but empty; `url` is ignored
+### [LOW] Finding #11: Minor code slop / redundancy in route handler status assignment
 
 **File:** `apps/web/src/app/api/setlist/proxy/route.ts`  
-**Lines:** 14-20  
-**Category:** broken-logic
+**Lines:** 35-36  
+**Category:** slop
 
 **Description:**
-The handler uses nullish coalescing (`??`) to select `id` over `url`. If the request includes `?id=` (empty string) and also includes a valid `?url=...`, `id` is treated as present (not null), so `url` is ignored, and the route returns a “Missing id or url” 400.
+The status computation is redundant and does not meaningfully branch; both sides return `result.status`. This looks like leftover code and adds noise to a security-sensitive route.
 
 **Code:**
 ```ts
-const id =
-  request.nextUrl.searchParams.get("id") ??
-  request.nextUrl.searchParams.get("url") ??
-  "";
-if (!id) {
-  return new Response(JSON.stringify({ error: "Missing id or url query parameter" }), { status: 400, ... });
-}
+const status = "error" in result ? result.status : result.status;
 ```
 
 **Why this matters:**
-Clients constructing URLs programmatically (or users editing query params) can trigger unexpected 400s even when a valid `url` parameter is present.
+Small, unnecessary redundancy increases maintenance burden and can hide real logic mistakes during future changes.
 
 ---
 
-### [MEDIUM] Finding #12: CORS handling is minimal and does not include common preflight headers; OPTIONS response likely insufficient for some browsers/clients
+## CORS-Specific Findings (Supporting File)
+
+### [MEDIUM] Finding #12: Dynamic `Access-Control-Allow-Origin` without `Vary: Origin` can enable cache confusion
 
 **File:** `apps/web/src/lib/cors.ts`  
-**Lines:** 19-26  
+**Lines:** 20-27  
 **Category:** will-break
 
 **Description:**
-`corsHeaders` only sets `Content-Type` and (optionally) `Access-Control-Allow-Origin`. It does not provide `Access-Control-Allow-Methods`, `Access-Control-Allow-Headers`, or `Access-Control-Max-Age`. The route defines an `OPTIONS` handler, but it uses the same minimal headers, which may fail preflight checks when requests include non-simple headers or methods.
+When CORS is enabled, `Access-Control-Allow-Origin` is set dynamically based on environment/request origin. The response headers do not include `Vary: Origin`. If an intermediary cache/CDN ever caches these GET responses, it could incorrectly serve a response with a previously set `Access-Control-Allow-Origin` value to a different requesting origin.
 
 **Code:**
 ```ts
@@ -329,100 +305,11 @@ export function corsHeaders(request: NextRequest, contentType = "application/jso
 ```
 
 **Why this matters:**
-If a frontend ever sends a request that triggers a preflight (custom headers, some fetch configurations, etc.), the browser can block the response and surface generic CORS errors.
-
----
-
-### [LOW] Finding #13: Missing `Vary: Origin` can cause incorrect caching behavior when behind shared caches/CDNs
-
-**File:** `apps/web/src/lib/cors.ts`  
-**Lines:** 19-26  
-**Category:** slop
-
-**Description:**
-Responses vary based on the request `Origin` header, but the implementation does not emit `Vary: Origin`. If an intermediary cache stores responses, it can serve the wrong `Access-Control-Allow-Origin` behavior across different requesting origins.
-
-**Code:**
-```ts
-const headers: HeadersInit = { "Content-Type": contentType };
-if (allowOrigin) {
-  (headers as Record<string, string>)["Access-Control-Allow-Origin"] = allowOrigin;
-}
-```
-
-**Why this matters:**
-CORS-related caching bugs are notoriously hard to diagnose; missing `Vary` increases the chance of intermittent failures in some deployments.
-
----
-
-### [LOW] Finding #14: `OPTIONS` handler returns JSON content type with a null body
-
-**File:** `apps/web/src/app/api/setlist/proxy/route.ts`  
-**Lines:** 5-7  
-**Category:** slop
-
-**Description:**
-The `OPTIONS` handler returns `new Response(null, ...)` but uses `corsHeaders(request)` which sets `Content-Type: application/json` by default.
-
-**Code:**
-```ts
-export async function OPTIONS(request: NextRequest) {
-  return new Response(null, { status: 204, headers: corsHeaders(request) });
-}
-```
-
-**Why this matters:**
-This is a minor semantic mismatch that can confuse debugging tools and does not reflect the actual body content.
-
----
-
-### [LOW] Finding #15: Minor code slop / redundancies in response handling
-
-**File:** `apps/web/src/app/api/setlist/proxy/route.ts`  
-**Lines:** 23-25  
-**Category:** slop
-
-**Description:**
-The `status` assignment is redundant (`result.status` in both branches), and the handler’s local naming (`id` storing `url` inputs) reduces clarity.
-
-**Code:**
-```ts
-const status = "error" in result ? result.status : result.status;
-const body = "error" in result ? { error: result.error } : result.body;
-```
-
-**Why this matters:**
-This increases maintenance overhead and makes audits for security-sensitive flows slightly harder.
-
----
-
-### [LOW] Finding #16: Error bodies are fully buffered into memory and parsed; no guardrails on size
-
-**File:** `apps/api/src/lib/setlistfm.ts`  
-**Lines:** 109-115  
-**Category:** will-break
-
-**Description:**
-On non-2xx responses, the code reads the entire response body via `await res.text()` and then attempts `JSON.parse(text)`. There is no size cap, and the resulting message may later be forwarded to the client (truncated at a later layer).
-
-**Code:**
-```ts
-const text = await res.text();
-try {
-  const json = JSON.parse(text) as { message?: string };
-  lastMessage = json.message ?? (text || res.statusText);
-} catch {
-  lastMessage = text || res.statusText;
-}
-```
-
-**Why this matters:**
-Large upstream error bodies can increase latency and memory usage, and the forwarded message content can still be user-visible (even if truncated later).
+This is a classic subtle CORS + caching interaction that can produce inconsistent behavior and, in some configurations, weaken origin isolation.
 
 ---
 
 ## External References
 
-- `https://api.setlist.fm/` (accessed 2026-02-14)  
-- `https://api.setlist.fm/docs/1.0/index.html` (accessed 2026-02-14)  
-- `https://www.setlist.fm/forum/setlistfm/setlistfm-api/406-response-code-for-apple-products-63d6e6c7` (accessed 2026-02-14)
+- setlist.fm API documentation (API keys via `x-api-key` header), accessed 2026-02-15: https://api.setlist.fm/docs/1.0/index.html  
+- setlist.fm API `GET /1.0/setlist/{setlistId}` (“current version” semantics), accessed 2026-02-15: https://api.setlist.fm/docs/1.0/resource__1.0_setlist__setlistId_.html
