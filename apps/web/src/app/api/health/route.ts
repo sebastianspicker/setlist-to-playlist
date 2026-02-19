@@ -1,10 +1,11 @@
 import { handleHealth } from "api";
-import { NextRequest } from "next/server";
-import { corsHeaders, corsHeadersForOptions } from "@/lib/cors";
+import { NextRequest, NextResponse } from "next/server";
+import { corsHeadersForOptions } from "@/lib/cors";
+import { jsonResponse } from "@/lib/api-response";
 
 /** DCI-043: OPTIONS for CORS preflight so cross-origin health checks succeed. DCI-053/054: use corsHeadersForOptions (no Content-Type, include Allow-Methods/Headers). */
 export async function OPTIONS(request: NextRequest) {
-  return new Response(null, { status: 204, headers: corsHeadersForOptions(request) });
+  return new NextResponse(null, { status: 204, headers: corsHeadersForOptions(request) });
 }
 
 /**
@@ -12,9 +13,5 @@ export async function OPTIONS(request: NextRequest) {
  * Returns 200 and { status: "ok", timestamp: "..." }.
  */
 export async function GET(request: NextRequest) {
-  const body = handleHealth();
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: corsHeaders(request),
-  });
+  return jsonResponse(handleHealth(), 200, request);
 }

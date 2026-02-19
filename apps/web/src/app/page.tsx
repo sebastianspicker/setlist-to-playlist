@@ -1,8 +1,9 @@
-import { SetlistImportView } from "@/features/setlist-import";
+import { SetlistImportView } from "@/features/setlist-import/SetlistImportView";
+import { mainContainerStyle } from "@/lib/styles";
 
 export default function HomePage() {
   return (
-    <main style={{ padding: "2rem", maxWidth: "40rem", margin: "0 auto", minWidth: 0 }}>
+    <main id="main" style={mainContainerStyle}>
       <h1>Setlist to Playlist</h1>
       <p>
         Import a setlist from setlist.fm (URL or setlist ID), preview the tracks,

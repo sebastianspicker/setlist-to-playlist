@@ -7,9 +7,56 @@
 body {
   margin: 0;
   font-family: system-ui, -apple-system, sans-serif;
+  font-size: 16px;
   line-height: 1.5;
   color: #1a1a1a;
   background: #fff;
+}
+
+/* Skip link: visible on focus for keyboard/screen reader (a11y) */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  z-index: 9999;
+  padding: 0.5rem 1rem;
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 1rem;
+  text-decoration: none;
+  border-radius: 4px;
+}
+.skip-link:focus {
+  left: 0.5rem;
+  top: 0.5rem;
+}
+
+/* Accessibility: visible focus for keyboard navigation (UI/UX Pro Max) */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+/* Touch targets: minimum 44px (WCAG 2.5.5) */
+button {
+  min-height: 44px;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+a[href] {
+  transition: color 0.2s ease;
+}
+
+/* Respect reduced motion (UI/UX Pro Max checklist) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Responsive: main flow usable at 320px */

@@ -56,3 +56,4 @@ In this repo, the **web app** (Next.js) serves both the PWA and the API. The API
 
 - setlist.fm responses can be cached in the proxy (in-memory or Redis) with a short TTL to reduce calls and protect the API key.
 - Apple catalog search results can be cached client-side per session to avoid duplicate requests during matching.
+- **Next 16+:** Cache Components (`use cache`, PPR) can cache server-rendered setlist or config; see `docs/tech/cache-components.md`.

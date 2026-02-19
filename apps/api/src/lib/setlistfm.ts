@@ -1,4 +1,4 @@
-const SETLISTFM_BASE = "https://api.setlist.fm/rest/1.0";
+import { SETLIST_FM_BASE_URL } from "@repo/shared";
 
 /** Extract setlist ID from setlist.fm URL or return trimmed input as raw ID. */
 export function parseSetlistIdFromInput(idOrUrl: string): string | null {
@@ -80,7 +80,7 @@ export async function fetchSetlistFromApi(
   const cached = getCached(setlistId);
   if (cached !== null) return { ok: true, body: cached };
 
-  const url = `${SETLISTFM_BASE}/setlist/${encodeURIComponent(setlistId)}`;
+  const url = `${SETLIST_FM_BASE_URL}/setlist/${encodeURIComponent(setlistId)}`;
   const headers: Record<string, string> = {
     "x-api-key": apiKey,
     Accept: "application/json",

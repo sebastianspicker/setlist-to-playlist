@@ -4,10 +4,14 @@ import { useState, useRef } from "react";
 import { mapSetlistFmToSetlist } from "@repo/core";
 import type { Setlist } from "@repo/core";
 import type { SetlistFmResponse } from "@repo/core";
+import { getErrorMessage, MAX_SETLIST_INPUT_LENGTH } from "@repo/shared";
 import { setlistProxyUrl } from "@/lib/api";
-import { ConnectAppleMusic, MatchingView } from "@/features/matching";
-import type { MatchRow } from "@/features/matching";
-import { CreatePlaylistView } from "@/features/playlist-export";
+import { ErrorAlert } from "@/components/ErrorAlert";
+import { SectionTitle } from "@/components/SectionTitle";
+import { ConnectAppleMusic } from "@/features/matching/ConnectAppleMusic";
+import { MatchingView } from "@/features/matching/MatchingView";
+import type { MatchRow } from "@/features/matching/MatchingView";
+import { CreatePlaylistView } from "@/features/playlist-export/CreatePlaylistView";
 import { SetlistPreview } from "./SetlistPreview";
 
 function ConnectAppleMusicInline() {
@@ -28,12 +32,9 @@ export function SetlistImportView() {
   const currentRequestRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  /** DCI-010: Avoid URL length limits; suggest using setlist ID for long URLs. */
-  const MAX_INPUT_LENGTH = 2000;
-
   async function loadSetlist(trimmed: string) {
     setError(null);
-    if (trimmed.length > MAX_INPUT_LENGTH) {
+    if (trimmed.length > MAX_SETLIST_INPUT_LENGTH) {
       setError(
         "Input is too long. Please paste the setlist ID only (e.g. 63de4613) or a shorter URL from setlist.fm."
       );
@@ -73,7 +74,7 @@ export function SetlistImportView() {
     } catch (err) {
       if ((err as { name?: string })?.name === "AbortError") return;
       if (currentRequestRef.current !== trimmed) return;
-      setError(err instanceof Error ? err.message : String(err ?? "Network error"));
+      setError(getErrorMessage(err, "Network error"));
       setSetlist(null);
     } finally {
       if (currentRequestRef.current === trimmed) {
@@ -101,6 +102,22 @@ export function SetlistImportView() {
   if (step === "matching" && setlist) {
     return (
       <section style={{ marginTop: "1.5rem" }}>
+        <button
+          type="button"
+          onClick={() => setStep("preview")}
+          aria-label="Back to setlist preview"
+          style={{
+            marginBottom: "1rem",
+            padding: "0.35rem 0.75rem",
+            fontSize: "0.9rem",
+            cursor: "pointer",
+            background: "transparent",
+            border: "1px solid #ccc",
+            borderRadius: "4px",
+          }}
+        >
+          ← Back to preview
+        </button>
         <p style={{ color: "#444", marginBottom: "0.5rem" }}>
           Setlist: <strong>{setlist.artist}</strong>
           {setlist.venue && ` at ${setlist.venue}`} — {(setlist.sets ?? []).flat().length} tracks.
@@ -123,6 +140,22 @@ export function SetlistImportView() {
   if (step === "export" && setlist && matchRows) {
     return (
       <section style={{ marginTop: "1.5rem" }}>
+        <button
+          type="button"
+          onClick={() => setStep("matching")}
+          aria-label="Back to matching"
+          style={{
+            marginBottom: "1rem",
+            padding: "0.35rem 0.75rem",
+            fontSize: "0.9rem",
+            cursor: "pointer",
+            background: "transparent",
+            border: "1px solid #ccc",
+            borderRadius: "4px",
+          }}
+        >
+          ← Back to matching
+        </button>
         <CreatePlaylistView setlist={setlist} matchRows={matchRows} />
       </section>
     );
@@ -130,7 +163,7 @@ export function SetlistImportView() {
 
   return (
     <section aria-label="Import setlist">
-      <h2 style={{ fontSize: "1.25rem", marginBottom: "0.75rem" }}>Import</h2>
+      <SectionTitle>Import</SectionTitle>
       <p style={{ marginBottom: "1rem", color: "#444" }}>
         Enter a setlist.fm URL or setlist ID (e.g. <code>63de4613</code>).
       </p>
@@ -179,30 +212,8 @@ export function SetlistImportView() {
       )}
 
       {error && (
-        <div
-          id="setlist-error"
-          role="alert"
-          style={{
-            marginTop: "0.75rem",
-            padding: "0.75rem",
-            background: "#fef2f2",
-            border: "1px solid #fecaca",
-            borderRadius: "4px",
-            color: "#b91c1c",
-          }}
-        >
-          <p style={{ margin: 0 }}>{error}</p>
-          <button
-            type="button"
-            onClick={handleRetry}
-            style={{
-              marginTop: "0.5rem",
-              padding: "0.25rem 0.75rem",
-              cursor: "pointer",
-            }}
-          >
-            Try again
-          </button>
+        <div id="setlist-error">
+          <ErrorAlert message={error} onRetry={handleRetry} retryLabel="Retry load setlist" />
         </div>
       )}
 

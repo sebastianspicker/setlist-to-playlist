@@ -1,28 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { buildSearchQuery } from "@repo/core";
+import { buildSearchQuery, flattenSetlistToEntries } from "@repo/core";
 import type { Setlist, SetlistEntry } from "@repo/core";
+import { SectionTitle } from "@/components/SectionTitle";
 import type { AppleMusicTrack } from "@/lib/musickit";
+import { primaryButtonStyle } from "@/lib/styles";
 import { searchCatalog } from "@/lib/musickit";
 
 export interface MatchRow {
   setlistEntry: SetlistEntry;
   appleTrack: AppleMusicTrack | null;
-}
-
-/** DCI-045: Skip null/non-object entries so malformed set data does not produce invalid rows. */
-function flattenSetlist(setlist: Setlist): SetlistEntry[] {
-  const entries: SetlistEntry[] = [];
-  const artist = setlist.artist;
-  for (const set of setlist.sets ?? []) {
-    if (!Array.isArray(set)) continue;
-    for (const entry of set) {
-      if (entry == null || typeof entry !== "object") continue;
-      entries.push({ ...entry, artist: entry.artist ?? artist });
-    }
-  }
-  return entries;
 }
 
 export interface MatchingViewProps {
@@ -31,7 +19,7 @@ export interface MatchingViewProps {
 }
 
 export function MatchingView({ setlist, onProceedToCreatePlaylist }: MatchingViewProps) {
-  const entries = flattenSetlist(setlist);
+  const entries = flattenSetlistToEntries(setlist);
   const [matches, setMatches] = useState<MatchRow[]>(() =>
     entries.map((setlistEntry) => ({ setlistEntry, appleTrack: null }))
   );
@@ -42,7 +30,7 @@ export function MatchingView({ setlist, onProceedToCreatePlaylist }: MatchingVie
   const [searching, setSearching] = useState(false);
 
   useEffect(() => {
-    const entriesFlat = flattenSetlist(setlist);
+    const entriesFlat = flattenSetlistToEntries(setlist);
     if (entriesFlat.length === 0) {
       setMatches([]);
       setLoadingSuggestions(false);
@@ -117,7 +105,7 @@ export function MatchingView({ setlist, onProceedToCreatePlaylist }: MatchingVie
 
   return (
     <section aria-label="Match tracks" style={{ marginTop: "1rem" }}>
-      <h2 style={{ fontSize: "1.25rem", marginBottom: "0.75rem" }}>Matching</h2>
+      <SectionTitle>Matching</SectionTitle>
       <p style={{ color: "#444", marginBottom: "1rem" }}>
         Confirm or change the Apple Music track for each setlist entry. You can skip entries.
       </p>
@@ -236,9 +224,7 @@ export function MatchingView({ setlist, onProceedToCreatePlaylist }: MatchingVie
           onClick={() => onProceedToCreatePlaylist(matches)}
           disabled={!canProceed}
           style={{
-            padding: "0.5rem 1rem",
-            fontSize: "1rem",
-            fontWeight: 600,
+            ...primaryButtonStyle,
             cursor: canProceed ? "pointer" : "not-allowed",
           }}
         >

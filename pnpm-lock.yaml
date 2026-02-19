@@ -23,6 +23,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@repo/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       jose:
         specifier: ^6.0.11
         version: 6.1.3

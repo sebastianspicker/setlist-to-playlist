@@ -1,29 +1,16 @@
-import type { Setlist } from "@repo/core";
+import { flattenSetlistToEntries, type Setlist } from "@repo/core";
+import { SectionTitle } from "@/components/SectionTitle";
 
 interface SetlistPreviewProps {
   setlist: Setlist;
 }
 
-/** Flatten sets into one ordered list for display. DCI-025: guard setlist.sets. DCI-034: guard each set as array. */
-function getAllTracks(setlist: Setlist): { name: string; info?: string }[] {
-  const tracks: { name: string; info?: string }[] = [];
-  for (const set of setlist.sets ?? []) {
-    if (!Array.isArray(set)) continue;
-    for (const entry of set) {
-      tracks.push({ name: entry?.name ?? "", info: entry?.info });
-    }
-  }
-  return tracks;
-}
-
 export function SetlistPreview({ setlist }: SetlistPreviewProps) {
-  const tracks = getAllTracks(setlist);
+  const tracks = flattenSetlistToEntries(setlist).map((e) => ({ name: e.name, info: e.info }));
 
   return (
     <section aria-label="Setlist preview" style={{ marginTop: "1.5rem" }}>
-      <h2 style={{ fontSize: "1.25rem", marginBottom: "0.75rem" }}>
-        {setlist.artist}
-      </h2>
+      <SectionTitle>{setlist.artist}</SectionTitle>
       <dl style={{ margin: 0, display: "grid", gap: "0.25rem 1rem" }}>
         {setlist.venue && (
           <>

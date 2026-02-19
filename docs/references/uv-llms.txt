@@ -1,1 +1,0 @@
-Placeholder: uv (Python) reference for LLMs if Python tooling is added.

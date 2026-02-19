@@ -3,8 +3,12 @@
  * MusicKit script must be loaded (e.g. in layout) before use.
  */
 
+import type { AppleTrack } from "@repo/core";
 import { devTokenUrl } from "./api";
 import { APPLE_MUSIC_APP_ID } from "./config";
+
+/** Apple Music catalog track; single source of truth from @repo/core AppleTrack. */
+export type AppleMusicTrack = AppleTrack;
 
 interface MusicKitGlobal {
   configure(options: MusicKitConfigureOptions): Promise<MusicKitInstance> | MusicKitInstance | void;
@@ -34,12 +38,6 @@ interface MusicKitInstance {
   };
 }
 
-export interface AppleMusicTrack {
-  id: string;
-  name: string;
-  artistName?: string;
-}
-
 /** DCI-012: Token cache with expiry (server token is 1h; refresh 5min before). */
 const TOKEN_CACHE_TTL_MS = 55 * 60 * 1000; // 55 minutes
 let cachedToken: string | null = null;
@@ -49,24 +47,34 @@ function isTokenValid(): boolean {
   return typeof cachedToken === "string" && Date.now() < tokenExpiresAt;
 }
 
+/** Developer Token API response: success with token or error message. */
+type DevTokenApiResponse = { token: string } | { error: string };
+
+function isDevTokenSuccess(
+  data: DevTokenApiResponse,
+): data is { token: string } {
+  return "token" in data && typeof data.token === "string";
+}
+
 /** Fetch Developer Token from our API; cache in memory with TTL. DCI-021: guard res.json(). */
 export async function fetchDeveloperToken(): Promise<string> {
   if (isTokenValid()) return cachedToken!;
   cachedToken = null;
   tokenExpiresAt = 0;
   const res = await fetch(devTokenUrl());
-  let data: { token?: string; error?: string };
+  let data: DevTokenApiResponse;
   try {
-    data = (await res.json()) as { token?: string; error?: string };
+    data = (await res.json()) as DevTokenApiResponse;
   } catch {
     throw new Error("Invalid response from Developer Token API (non-JSON).");
   }
-  if (!res.ok || data.error || !data.token) {
-    throw new Error(data.error ?? "Failed to get Developer Token");
+  if (!res.ok || !isDevTokenSuccess(data)) {
+    const message = !isDevTokenSuccess(data) ? data.error : "Failed to get Developer Token";
+    throw new Error(message);
   }
   cachedToken = data.token;
   tokenExpiresAt = Date.now() + TOKEN_CACHE_TTL_MS;
-  return cachedToken;
+  return data.token;
 }
 
 /** Wait for MusicKit script to be available. */

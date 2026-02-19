@@ -19,6 +19,9 @@ export default function RootLayout({
         <meta name="theme-color" content="#1a1a1a" />
       </head>
       <body>
+        <a href="#main" className="skip-link">
+          Skip to main content
+        </a>
         {/* DCI-020: crossOrigin for future SRI; SRI not added—Apple does not publish a stable integrity hash. */}
         <Script
           src="https://js-cdn.music.apple.com/musickit/v3/musickit.js"

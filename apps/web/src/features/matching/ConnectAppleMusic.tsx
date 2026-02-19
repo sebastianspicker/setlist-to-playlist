@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { getErrorMessage } from "@repo/shared";
+import { ErrorAlert } from "@/components/ErrorAlert";
 import { authorizeMusicKit, initMusicKit } from "@/lib/musickit";
 
 export interface ConnectAppleMusicProps {
@@ -26,8 +28,7 @@ export function ConnectAppleMusic({
       await authorizeMusicKit();
       onAuthorized?.();
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : String(err ?? "Authorization failed");
+      const message = getErrorMessage(err, "Authorization failed");
       const friendly =
         message.includes("cancel") || message.includes("denied")
           ? "You cancelled or denied access. Click below to try again."
@@ -56,26 +57,11 @@ export function ConnectAppleMusic({
         {loading ? "Connecting…" : label}
       </button>
       {error && (
-        <div
-          role="alert"
-          style={{
-            marginTop: "0.75rem",
-            padding: "0.75rem",
-            background: "#fef2f2",
-            border: "1px solid #fecaca",
-            borderRadius: "4px",
-            color: "#b91c1c",
-          }}
-        >
-          <p style={{ margin: 0 }}>{error}</p>
-          <button
-            type="button"
-            onClick={handleAuthorize}
-            style={{ marginTop: "0.5rem", padding: "0.25rem 0.75rem", cursor: "pointer" }}
-          >
-            Try again
-          </button>
-        </div>
+        <ErrorAlert
+          message={error}
+          onRetry={handleAuthorize}
+          retryLabel="Try connecting again"
+        />
       )}
     </div>
   );

@@ -67,20 +67,18 @@ temp/
 # PWA / optional
 *.webmanifest.bak
 
-# Ralph Audit
-ralph-audit/.last-message.md
-ralph-audit/.last-story
-ralph-audit/.model-check.log
-ralph-audit/.prompt.md
-ralph-audit/.story-attempts
-ralph-audit/run.log
-ralph-audit/events.log
-
-# Ralph Fix
-ralph-fix/.last-message.md
-ralph-fix/.last-story
-ralph-fix/.model-check.log
-ralph-fix/.prompt.md
-ralph-fix/.story-attempts
-ralph-fix/run.log
-ralph-fix/events.log
+# Ralph Audit / Fixes (moved under docs/audit, docs/fixes)
+docs/audit/.last-message.md
+docs/audit/.last-story
+docs/audit/.model-check.log
+docs/audit/.prompt.md
+docs/audit/.story-attempts
+docs/audit/run.log
+docs/audit/events.log
+docs/fixes/.last-message.md
+docs/fixes/.last-story
+docs/fixes/.model-check.log
+docs/fixes/.prompt.md
+docs/fixes/.story-attempts
+docs/fixes/run.log
+docs/fixes/events.log

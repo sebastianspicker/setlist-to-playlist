@@ -2,25 +2,23 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { handleDevToken } from "../src/routes/apple/dev-token.js";
+import { saveEnv, restoreEnv } from "./helpers/env.js";
 
 const FIXTURE_KEY_PATH = join(process.cwd(), "tests/fixtures/apple-test-key.pem");
+const APPLE_ENV_KEYS = ["APPLE_TEAM_ID", "APPLE_KEY_ID", "APPLE_PRIVATE_KEY"];
 
 /** JWT shape: three base64url segments separated by dots */
 const JWT_REGEX = /^[\w-]+\.[\w-]+\.[\w-]+$/;
 
 describe("dev-token", () => {
-  const origEnv: Record<string, string | undefined> = {};
+  let savedEnv: Record<string, string | undefined>;
 
   beforeEach(() => {
-    origEnv.APPLE_TEAM_ID = process.env.APPLE_TEAM_ID;
-    origEnv.APPLE_KEY_ID = process.env.APPLE_KEY_ID;
-    origEnv.APPLE_PRIVATE_KEY = process.env.APPLE_PRIVATE_KEY;
+    savedEnv = saveEnv(APPLE_ENV_KEYS);
   });
 
   afterEach(() => {
-    process.env.APPLE_TEAM_ID = origEnv.APPLE_TEAM_ID;
-    process.env.APPLE_KEY_ID = origEnv.APPLE_KEY_ID;
-    process.env.APPLE_PRIVATE_KEY = origEnv.APPLE_PRIVATE_KEY;
+    restoreEnv(APPLE_ENV_KEYS, savedEnv);
   });
 
   it("returns error when Apple credentials are missing", async () => {

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
+import { getErrorMessage } from "@repo/shared";
+import { ErrorBoundaryView } from "@/components/ErrorBoundaryView";
 
 export default function Error({
   error,
@@ -13,26 +15,7 @@ export default function Error({
     console.error(error);
   }, [error]);
 
-  const message = error instanceof Error ? error.message : String(error ?? "Unknown error");
+  const message = getErrorMessage(error, "An error occurred. You can try again.");
 
-  return (
-    <main style={{ padding: "2rem", maxWidth: "40rem", margin: "0 auto" }}>
-      <h1>Something went wrong</h1>
-      <p style={{ color: "#666", marginTop: "0.5rem" }}>
-        {message || "An error occurred. You can try again."}
-      </p>
-      <button
-        type="button"
-        onClick={reset}
-        style={{
-          marginTop: "1rem",
-          padding: "0.5rem 1rem",
-          fontSize: "1rem",
-          cursor: "pointer",
-        }}
-      >
-        Try again
-      </button>
-    </main>
-  );
+  return <ErrorBoundaryView message={message} onReset={reset} />;
 }

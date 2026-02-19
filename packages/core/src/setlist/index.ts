@@ -7,3 +7,4 @@ export type {
   SetlistFmSet,
 } from "./setlistfm-types.js";
 export { mapSetlistFmToSetlist } from "./mapper.js";
+export { flattenSetlistToEntries } from "./flatten.js";

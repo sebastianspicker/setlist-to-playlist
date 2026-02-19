@@ -2,15 +2,16 @@
 
 import { useState } from "react";
 import type { Setlist } from "@repo/core";
-import type { MatchRow } from "@/features/matching";
+import { getErrorMessage } from "@repo/shared";
+import type { MatchRow } from "@/features/matching/MatchingView";
 import {
   isMusicKitAuthorized,
-  authorizeMusicKit,
-  initMusicKit,
   createLibraryPlaylist,
   addTracksToLibraryPlaylist,
 } from "@/lib/musickit";
-import { ConnectAppleMusic } from "@/features/matching";
+import { ErrorAlert } from "@/components/ErrorAlert";
+import { SectionTitle } from "@/components/SectionTitle";
+import { ConnectAppleMusic } from "@/features/matching/ConnectAppleMusic";
 
 export interface CreatePlaylistViewProps {
   setlist: Setlist;
@@ -60,11 +61,10 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
         setCreated({ id, url });
       } catch (addErr) {
         setCreated({ id, url });
-        setAddTracksError(addErr instanceof Error ? addErr.message : String(addErr ?? "Adding tracks failed."));
+        setAddTracksError(getErrorMessage(addErr, "Adding tracks failed."));
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err ?? "Failed to create playlist");
-      setError(message);
+      setError(getErrorMessage(err, "Failed to create playlist"));
     } finally {
       setLoading(false);
     }
@@ -79,7 +79,7 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
       await addTracksToLibraryPlaylist(created.id, songIds);
       setAddTracksError(null);
     } catch (err) {
-      setAddTracksError(err instanceof Error ? err.message : String(err ?? "Adding tracks failed."));
+      setAddTracksError(getErrorMessage(err, "Adding tracks failed."));
     } finally {
       setLoading(false);
     }
@@ -154,7 +154,7 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
 
   return (
     <section aria-label="Create playlist">
-      <h2 style={{ fontSize: "1.25rem", marginBottom: "0.75rem" }}>Create playlist</h2>
+      <SectionTitle>Create playlist</SectionTitle>
       <p>
         Ready to create a playlist with <strong>{count}</strong> track{count !== 1 ? "s" : ""}.
       </p>
@@ -186,29 +186,14 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
       )}
 
       {error && (
-        <div
-          role="alert"
-          style={{
-            marginTop: "1rem",
-            padding: "0.75rem",
-            background: "#fef2f2",
-            border: "1px solid #fecaca",
-            borderRadius: "4px",
-            color: "#b91c1c",
+        <ErrorAlert
+          message={error}
+          onRetry={() => {
+            setError(null);
+            handleCreate();
           }}
-        >
-          <p style={{ margin: 0 }}>{error}</p>
-          <button
-            type="button"
-            onClick={() => {
-              setError(null);
-              handleCreate();
-            }}
-            style={{ marginTop: "0.5rem", padding: "0.25rem 0.75rem", cursor: "pointer" }}
-          >
-            Try again
-          </button>
-        </div>
+          retryLabel="Retry create playlist"
+        />
       )}
     </section>
   );

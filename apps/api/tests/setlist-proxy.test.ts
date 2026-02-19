@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { parseSetlistIdFromInput } from "../src/lib/setlistfm.js";
 import { handleSetlistProxy } from "../src/routes/setlist/proxy.js";
+import { saveEnv, restoreEnv } from "./helpers/env.js";
+
+const SETLIST_ENV_KEYS = ["SETLISTFM_API_KEY"];
 
 describe("parseSetlistIdFromInput", () => {
   it("returns raw ID when input is a plain setlist ID", () => {
@@ -31,10 +34,14 @@ describe("parseSetlistIdFromInput", () => {
 });
 
 describe("handleSetlistProxy", () => {
-  const origKey = process.env.SETLISTFM_API_KEY;
+  let savedEnv: Record<string, string | undefined>;
+
+  beforeEach(() => {
+    savedEnv = saveEnv(SETLIST_ENV_KEYS);
+  });
 
   afterEach(() => {
-    process.env.SETLISTFM_API_KEY = origKey;
+    restoreEnv(SETLIST_ENV_KEYS, savedEnv);
     vi.restoreAllMocks();
   });
 

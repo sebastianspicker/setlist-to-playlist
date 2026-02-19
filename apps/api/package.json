@@ -9,7 +9,10 @@
     "lint": "eslint src --ext .ts",
     "test": "vitest run"
   },
-  "dependencies": { "jose": "^6.0.11" },
+  "dependencies": {
+    "@repo/shared": "workspace:*",
+    "jose": "^6.0.11"
+  },
   "devDependencies": {
     "@types/node": "^22.10.1",
     "typescript": "^5.7.2",
