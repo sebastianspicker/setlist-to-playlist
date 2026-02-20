@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * A reusable UI component that displays an inline error message along with a retry button.
+ * Designed to be used within smaller sections of the UI that fail to load or process.
+ */
+
 export interface ErrorAlertProps {
   message: string;
   onRetry: () => void;

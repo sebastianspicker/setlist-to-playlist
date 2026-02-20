@@ -20,6 +20,11 @@ function ConnectAppleMusicInline() {
 
 type Step = "import" | "preview" | "matching" | "export";
 
+/**
+ * Main View Component for importing a Setlist from setlist.fm.
+ * It manages the user input, loading states, error boundaries, 
+ * and sequence orchestration leading into the track matching phase.
+ */
 export function SetlistImportView() {
   const [inputValue, setInputValue] = useState("");
   const [setlist, setSetlist] = useState<Setlist | null>(null);
@@ -28,7 +33,8 @@ export function SetlistImportView() {
   const [step, setStep] = useState<Step>("import");
   const [matchRows, setMatchRows] = useState<MatchRow[] | null>(null);
 
-  /** DCI-042: Ignore stale responses; only update state for the latest request. */
+  // References to handle race conditions during rapid consecutive network requests.
+  // The AbortController actively cancels in-flight duplicate requests if a user types too quickly.
   const currentRequestRef = useRef<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -106,23 +112,16 @@ export function SetlistImportView() {
           type="button"
           onClick={() => setStep("preview")}
           aria-label="Back to setlist preview"
-          style={{
-            marginBottom: "1rem",
-            padding: "0.35rem 0.75rem",
-            fontSize: "0.9rem",
-            cursor: "pointer",
-            background: "transparent",
-            border: "1px solid #ccc",
-            borderRadius: "4px",
-          }}
+          className="premium-button secondary"
+          style={{ marginBottom: "1rem", padding: "0.35rem 0.75rem", fontSize: "0.9rem" }}
         >
           ← Back to preview
         </button>
-        <p style={{ color: "#444", marginBottom: "0.5rem" }}>
+        <p style={{ color: "var(--text-main)", marginBottom: "0.5rem" }}>
           Setlist: <strong>{setlist.artist}</strong>
           {setlist.venue && ` at ${setlist.venue}`} — {(setlist.sets ?? []).flat().length} tracks.
         </p>
-        <p style={{ color: "#666", fontSize: "0.9em", marginBottom: "0.5rem" }}>
+        <p style={{ color: "var(--text-muted)", fontSize: "0.9em", marginBottom: "0.5rem" }}>
           Connect Apple Music to search for tracks (required for suggestions).
         </p>
         <ConnectAppleMusicInline />
@@ -144,15 +143,8 @@ export function SetlistImportView() {
           type="button"
           onClick={() => setStep("matching")}
           aria-label="Back to matching"
-          style={{
-            marginBottom: "1rem",
-            padding: "0.35rem 0.75rem",
-            fontSize: "0.9rem",
-            cursor: "pointer",
-            background: "transparent",
-            border: "1px solid #ccc",
-            borderRadius: "4px",
-          }}
+          className="premium-button secondary"
+          style={{ marginBottom: "1rem", padding: "0.35rem 0.75rem", fontSize: "0.9rem" }}
         >
           ← Back to matching
         </button>
@@ -162,51 +154,41 @@ export function SetlistImportView() {
   }
 
   return (
-    <section aria-label="Import setlist">
+    <section aria-label="Import setlist" className="glass-panel" style={{ marginTop: "2rem" }}>
       <SectionTitle>Import</SectionTitle>
-      <p style={{ marginBottom: "1rem", color: "#444" }}>
-        Enter a setlist.fm URL or setlist ID (e.g. <code>63de4613</code>).
+      <p style={{ marginBottom: "1.5rem", color: "var(--text-muted)" }}>
+        Enter a setlist.fm URL or setlist ID (e.g. <code style={{ color: "var(--accent-primary)" }}>63de4613</code>).
       </p>
 
-      <form onSubmit={handleSubmit} style={{ marginBottom: "1rem" }}>
-        <label htmlFor="setlist-input" style={{ display: "block", marginBottom: "0.25rem" }}>
-          Setlist URL or ID
-        </label>
-        <input
-          id="setlist-input"
-          type="text"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          placeholder="https://www.setlist.fm/... or 63de4613"
-          disabled={loading}
-          aria-invalid={!!error}
-          aria-describedby={error ? "setlist-error" : undefined}
-          style={{
-            width: "100%",
-            maxWidth: "28rem",
-            padding: "0.5rem 0.75rem",
-            fontSize: "1rem",
-            border: "1px solid #ccc",
-            borderRadius: "4px",
-          }}
-        />
+      <form onSubmit={handleSubmit} style={{ marginBottom: "1.5rem", display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "flex-end" }}>
+        <div style={{ flex: "1 1 auto", minWidth: "200px", maxWidth: "28rem" }}>
+          <label htmlFor="setlist-input" style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "var(--text-main)" }}>
+            Setlist URL or ID
+          </label>
+          <input
+            id="setlist-input"
+            type="text"
+            className="premium-input"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder="https://www.setlist.fm/... or 63de4613"
+            disabled={loading}
+            aria-invalid={!!error}
+            aria-describedby={error ? "setlist-error" : undefined}
+          />
+        </div>
         <button
           type="submit"
+          className="premium-button"
           disabled={loading || !inputValue.trim()}
-          style={{
-            marginLeft: "0.5rem",
-            marginTop: "0.5rem",
-            padding: "0.5rem 1rem",
-            fontSize: "1rem",
-            cursor: loading ? "not-allowed" : "pointer",
-          }}
+          style={{ height: "46px" }}
         >
           {loading ? "Loading…" : "Load setlist"}
         </button>
       </form>
 
       {loading && (
-        <p role="status" aria-live="polite" style={{ color: "#666" }}>
+        <p role="status" aria-live="polite" style={{ color: "var(--accent-primary)", fontWeight: 500 }}>
           Loading setlist…
         </p>
       )}
@@ -222,14 +204,9 @@ export function SetlistImportView() {
           <SetlistPreview setlist={setlist} />
           <button
             type="button"
+            className="premium-button"
             onClick={goToMatching}
-            style={{
-              marginTop: "1.5rem",
-              padding: "0.5rem 1rem",
-              fontSize: "1rem",
-              cursor: "pointer",
-              fontWeight: 600,
-            }}
+            style={{ marginTop: "1.5rem" }}
           >
             Continue to Matching →
           </button>

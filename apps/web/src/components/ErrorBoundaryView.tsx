@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * A full-page error boundary fallback view.
+ * Displays a generic "Something went wrong" message and a button to reset the view.
+ * Useful for top-level app errors or major feature crashes.
+ */
+
 export interface ErrorBoundaryViewProps {
   message: string;
   onReset: () => void;

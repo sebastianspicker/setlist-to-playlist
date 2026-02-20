@@ -4,6 +4,10 @@ import { useEffect } from "react";
 import { getErrorMessage } from "@repo/shared";
 import { ErrorBoundaryView } from "@/components/ErrorBoundaryView";
 
+/**
+ * Next.js App Router root error boundary template.
+ * Catches unhandled exceptions in the React tree and displays the ErrorBoundaryView.
+ */
 export default function Error({
   error,
   reset,

@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * A standardized, reusable heading component for major UI sections.
+ * Ensures consistent typographic styling throughout the application.
+ */
+
 export interface SectionTitleProps {
   children: React.ReactNode;
 }

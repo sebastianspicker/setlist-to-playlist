@@ -12,7 +12,7 @@ export function getAllowOrigin(origin: string | null): string | null {
     (origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1"));
   if (configured) {
     const single = configured.split(",")[0].trim().replace(/\/$/, "");
-    return single || (isLocalOrigin ? origin : null);
+    return single || null;
   }
   return isLocalOrigin ? origin : null;
 }

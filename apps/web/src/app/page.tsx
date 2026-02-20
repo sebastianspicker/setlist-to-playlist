@@ -1,6 +1,10 @@
 import { SetlistImportView } from "@/features/setlist-import/SetlistImportView";
 import { mainContainerStyle } from "@/lib/styles";
 
+/**
+ * The main landing page of the application.
+ * Instructs the user on how to use the app and embeds the core SetlistImportView.
+ */
 export default function HomePage() {
   return (
     <main id="main" style={mainContainerStyle}>

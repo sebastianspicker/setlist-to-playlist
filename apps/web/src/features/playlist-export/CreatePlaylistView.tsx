@@ -25,12 +25,18 @@ function buildPlaylistName(setlist: Setlist): string {
   return parts.length > 0 ? parts.join(" – ") : "Setlist";
 }
 
+/**
+ * Renders the final stage of the application where matched tracks are committed to the user's Apple Music Library.
+ * It handles the MusicKit authorization flow gracefully before making the API calls to progressively save the playlist.
+ */
 export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ id: string; url?: string } | null>(null);
   const [needsAuth, setNeedsAuth] = useState(false);
-  /** DCI-003: When playlist was created but add-tracks failed; retry only adds tracks. */
+
+  // Tracks if the playlist container was successfully created but individual sub-tracks failed to append.
+  // This allows the user to safely retry adding only the tracks without duplicating the empty playlist container.
   const [addTracksError, setAddTracksError] = useState<string | null>(null);
 
   const songIds = matchRows.map((r) => r.appleTrack?.id).filter(Boolean) as string[];
@@ -70,7 +76,10 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
     }
   }
 
-  /** DCI-057: Retry sends all song IDs again; Apple Music API add is idempotent per track, so duplicates are not created. */
+  /**
+   * Safe retry mechanism: Sends all song IDs again.
+   * Apple Music API add-track endpoints are idempotent per track, preventing duplicate items from stacking.
+   */
   async function handleAddRemainingTracks() {
     if (!created || songIds.length === 0) return;
     setAddTracksError(null);
@@ -98,30 +107,25 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
     return (
       <div
         role="status"
+        className="glass-panel"
         style={{
-          marginTop: "1rem",
-          padding: "1rem",
-          background: "#f0fdf4",
-          border: "1px solid #bbf7d0",
-          borderRadius: "4px",
+          marginTop: "1.5rem",
+          background: "rgba(16, 185, 129, 0.1)",
+          borderColor: "var(--success)",
         }}
       >
-        <p style={{ margin: 0, fontWeight: 600 }}>Playlist created.</p>
+        <p style={{ margin: 0, fontWeight: 600, color: "var(--success)" }}>Playlist created.</p>
         {addTracksError ? (
           <>
-            <p style={{ margin: "0.5rem 0 0", color: "#b45309" }}>
+            <p style={{ margin: "0.5rem 0 0", color: "var(--danger)" }}>
               Playlist was created but adding tracks failed: {addTracksError}
             </p>
             <button
               type="button"
+              className="premium-button secondary"
               onClick={handleAddRemainingTracks}
               disabled={loading}
-              style={{
-                marginTop: "0.5rem",
-                padding: "0.35rem 0.75rem",
-                fontSize: "0.9rem",
-                cursor: loading ? "wait" : "pointer",
-              }}
+              style={{ marginTop: "1rem" }}
             >
               {loading ? "Adding…" : "Add tracks to this playlist"}
             </button>
@@ -129,18 +133,18 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
         ) : (
           <>
             {isSafeUrl ? (
-              <p style={{ margin: "0.5rem 0 0", color: "#166534" }}>
+              <p style={{ margin: "0.5rem 0 0" }}>
                 <a
                   href={rawUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ color: "inherit", textDecoration: "underline" }}
+                  style={{ color: "var(--accent-primary)", textDecoration: "underline" }}
                 >
                   Open in Apple Music →
                 </a>
               </p>
             ) : (
-              <p style={{ margin: "0.5rem 0 0", color: "#166534" }}>
+              <p style={{ margin: "0.5rem 0 0", color: "var(--text-muted)" }}>
                 Open the Apple Music app and check your library for the new playlist.
               </p>
             )}
@@ -153,15 +157,15 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
   const count = matchRows.filter((m) => m.appleTrack !== null).length;
 
   return (
-    <section aria-label="Create playlist">
+    <section aria-label="Create playlist" className="glass-panel" style={{ marginTop: "2rem" }}>
       <SectionTitle>Create playlist</SectionTitle>
-      <p>
-        Ready to create a playlist with <strong>{count}</strong> track{count !== 1 ? "s" : ""}.
+      <p style={{ color: "var(--text-main)" }}>
+        Ready to create a playlist with <strong style={{ color: "var(--accent-primary)" }}>{count}</strong> track{count !== 1 ? "s" : ""}.
       </p>
 
       {needsAuth && (
-        <div style={{ marginTop: "1rem" }}>
-          <p style={{ color: "#b45309", marginBottom: "0.5rem" }}>
+        <div style={{ marginTop: "1.5rem" }}>
+          <p style={{ color: "var(--danger)", marginBottom: "0.75rem" }}>
             Connect Apple Music to create the playlist in your library.
           </p>
           <ConnectAppleMusic onAuthorized={handleAuthorized} label="Connect Apple Music" />
@@ -171,15 +175,10 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
       {!needsAuth && (
         <button
           type="button"
+          className="premium-button"
           onClick={handleCreate}
           disabled={loading || count === 0}
-          style={{
-            marginTop: "1rem",
-            padding: "0.5rem 1rem",
-            fontSize: "1rem",
-            fontWeight: 600,
-            cursor: count === 0 || loading ? "not-allowed" : "pointer",
-          }}
+          style={{ marginTop: "1.5rem" }}
         >
           {loading ? "Creating…" : "Create playlist"}
         </button>

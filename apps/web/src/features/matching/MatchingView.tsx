@@ -18,6 +18,10 @@ export interface MatchingViewProps {
   onProceedToCreatePlaylist: (matches: MatchRow[]) => void;
 }
 
+/**
+ * Renders the interface for matching parsed Setlist.fm tracks against the Apple Music catalog.
+ * Automatically triggers background searches for tracks and allows manual user overrides.
+ */
 export function MatchingView({ setlist, onProceedToCreatePlaylist }: MatchingViewProps) {
   const entries = flattenSetlistToEntries(setlist);
   const [matches, setMatches] = useState<MatchRow[]>(() =>

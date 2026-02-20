@@ -8,6 +8,10 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
 };
 
+/**
+ * The global Next.js Root Layout wrapper.
+ * Injects global CSS, metadata, and the mandatory Apple MusicKit external JS script bundle.
+ */
 export default function RootLayout({
   children,
 }: Readonly<{

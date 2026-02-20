@@ -32,6 +32,7 @@ Thumbs.db
 *.lnk
 .Spotlight-V100
 .Trashes
+.cursor/
 
 # Logs and debug
 *.log

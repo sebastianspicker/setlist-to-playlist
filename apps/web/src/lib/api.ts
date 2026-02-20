@@ -18,7 +18,15 @@ export function apiUrl(path: string): string {
   return `${API_PATH}${p}`;
 }
 
+/** Returns the full URL for the Apple Developer Token endpoint. */
 export const devTokenUrl = () => apiUrl("/apple/dev-token");
+
+/**
+ * Returns the full URL for the Setlist.fm proxy endpoint.
+ * @param query Optional query string (e.g. `setlistId=...`)
+ */
 export const setlistProxyUrl = (query?: string) =>
   apiUrl("/setlist/proxy") + (query ? `?${query}` : "");
+
+/** Returns the full URL for the API health check endpoint. */
 export const healthUrl = () => apiUrl("/health");

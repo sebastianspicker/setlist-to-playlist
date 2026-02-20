@@ -1,6 +1,9 @@
 import { SETLIST_FM_BASE_URL } from "@repo/shared";
 
-/** Extract setlist ID from setlist.fm URL or return trimmed input as raw ID. */
+/** 
+ * Extracts the raw setlist ID from either a direct string or a full setlist.fm URL.
+ * It strictly validates input formats to avoid sending malformed IDs to the API. 
+ */
 export function parseSetlistIdFromInput(idOrUrl: string): string | null {
   const trimmed = idOrUrl.trim();
   if (!trimmed) return null;
@@ -12,13 +15,16 @@ export function parseSetlistIdFromInput(idOrUrl: string): string | null {
   ) {
     try {
       const url = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
-      // DCI-060: only accept URLs whose host is setlist.fm (reject third-party domains containing "setlist.fm" in path)
+      // Ensure the URL comes exclusively from setlist.fm domains to prevent SSRF vulnerabilities or malformed third-party inputs.
       if (!url.hostname.toLowerCase().includes("setlist.fm")) return null;
+
       const path = url.pathname;
-      // e.g. /setlist/.../63de4613.html or .../abc1.html (DCI-005: allow 4-12 hex chars)
+
+      // Attempt to extract the 4-12 character hexadecimal ID directly from standard setlist.fm URL formats (e.g., /setlist/.../63de4613.html)
       const match = path.match(/-([a-f0-9]{4,12})\.html$/i);
       if (match) return match[1];
-      // fallback: last path segment without .html
+
+      // Fallback extraction technique: Look at the final segment of the URL path as a last resort.
       const segment = path.split("/").filter(Boolean).pop() ?? "";
       const withoutHtml = segment.replace(/\.html$/i, "");
       const idPart = withoutHtml.split("-").pop();
@@ -30,7 +36,8 @@ export function parseSetlistIdFromInput(idOrUrl: string): string | null {
     return null;
   }
 
-  // raw ID (alphanumeric, possibly with hyphens)
+  // Finally, if it isn't a URL, check if the input is just the raw ID string.
+  // We validate it as a 4-64 character alphanumeric sequence containing hyphens.
   if (/^[a-f0-9-]{4,64}$/i.test(trimmed)) return trimmed;
   return null;
 }
@@ -47,7 +54,10 @@ function getCached(id: string): unknown | null {
   return entry.body;
 }
 
-/** DCI-038: Evict expired entries. DCI-048: Only run eviction when over threshold to avoid O(n) on every write. */
+/** 
+ * Defines a structural upper limit for the local memory cache to avoid performance degradation.
+ * Exceeding this threshold triggers an O(n) eviction process exactly once.
+ */
 const CACHE_EVICT_THRESHOLD = 200;
 
 function evictExpired(): void {
@@ -60,6 +70,13 @@ function evictExpired(): void {
 }
 
 function setCached(id: string, body: unknown): void {
+  // Prevent Out-Of-Memory (OOM) denial of service by rejecting suspiciously huge JSON payloads.
+  // 500,000 characters translates to roughly 500 KB which is well above any standard setlist JSON.
+  const strBody = JSON.stringify(body);
+  if (strBody.length > 500_000) {
+    return;
+  }
+
   cache.set(id, { body, expires: Date.now() + CACHE_TTL_MS });
   if (cache.size > CACHE_EVICT_THRESHOLD) {
     evictExpired();
@@ -73,10 +90,16 @@ export type FetchSetlistResult =
   | { ok: true; body: unknown }
   | { ok: false; status: number; message: string };
 
+/**
+ * Main logical handler to fetch setlist data from the external Setlist.fm API instance.
+ * @param setlistId The cleaned identifier string (e.g. '63de4613').
+ * @param apiKey The secret authorization token provided for Setlist.fm.
+ */
 export async function fetchSetlistFromApi(
   setlistId: string,
   apiKey: string
 ): Promise<FetchSetlistResult> {
+  // Always query our local memory cache first to severely reduce repeated outbound calls and save rate limit points.
   const cached = getCached(setlistId);
   if (cached !== null) return { ok: true, body: cached };
 
@@ -89,6 +112,7 @@ export async function fetchSetlistFromApi(
   let lastStatus = 0;
   let lastMessage = "";
 
+  // Iteratively fetch the API up to the allowed retry limit since Setlist.fm can rigidly reject too frequent requests instantly (HTTP 429).
   for (let attempt = 0; attempt <= MAX_RETRIES_429; attempt++) {
     const res = await fetch(url, { headers });
     lastStatus = res.status;
@@ -97,6 +121,10 @@ export async function fetchSetlistFromApi(
       let body: unknown;
       try {
         body = (await res.json()) as unknown;
+        // Verify JSON was parsed as a structural object since parsing primitive types is valid in standard JSON but invalid for our logic.
+        if (!body || typeof body !== "object") {
+          throw new Error("Invalid structure");
+        }
       } catch {
         return {
           ok: false,
@@ -104,10 +132,13 @@ export async function fetchSetlistFromApi(
           message: "Invalid response from setlist.fm (non-JSON body).",
         };
       }
+
+      // Store the successful data in memory to serve future identical requests efficiently.
       setCached(setlistId, body);
       return { ok: true, body };
     }
 
+    // Encountering an error response: Record the response body for troubleshooting. 
     const text = await res.text();
     try {
       const json = JSON.parse(text) as { message?: string };
@@ -116,11 +147,20 @@ export async function fetchSetlistFromApi(
       lastMessage = text || res.statusText;
     }
 
-    if (res.status === 429 && attempt < MAX_RETRIES_429) {
-      await new Promise((r) => setTimeout(r, BACKOFF_MS * (attempt + 1)));
-      continue;
+    // Rate Limit Condition: When we encounter an HTTP 429, pause processing iteratively by waiting via the designated backoff interval.
+    if (res.status === 429) {
+      if (attempt < MAX_RETRIES_429) {
+        await new Promise((resolve) => setTimeout(resolve, BACKOFF_MS));
+        continue;
+      }
+      return {
+        ok: false,
+        status: 429,
+        message: lastMessage || "setlist.fm rate limit exceeded. Please try again in a moment.",
+      };
     }
 
+    // All other HTTP status codes (404, 500, etc) immediately terminate the retry loop.
     break;
   }
 

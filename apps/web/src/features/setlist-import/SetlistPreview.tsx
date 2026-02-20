@@ -5,6 +5,10 @@ interface SetlistPreviewProps {
   setlist: Setlist;
 }
 
+/**
+ * Renders a read-only preview of a parsed setlist before the user proceeds to track matching.
+ * Displays the event metadata and a flattened, ordered list of tracks.
+ */
 export function SetlistPreview({ setlist }: SetlistPreviewProps) {
   const tracks = flattenSetlistToEntries(setlist).map((e) => ({ name: e.name, info: e.info }));
 
