@@ -1,11 +1,11 @@
 import { handleSetlistProxy } from "api";
-import { NextRequest, NextResponse } from "next/server";
-import { MAX_SETLIST_INPUT_LENGTH } from "@repo/shared";
-import { corsHeadersForOptions } from "@/lib/cors";
+import { NextRequest } from "next/server";
+import { isErr, MAX_SETLIST_INPUT_LENGTH, SETLIST_MESSAGES } from "@repo/shared";
 import { jsonResponse } from "@/lib/api-response";
+import { internalError, optionsNoContent } from "../../_helpers";
 
 export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, { status: 204, headers: corsHeadersForOptions(request) });
+  return optionsNoContent(request);
 }
 
 /**
@@ -19,26 +19,16 @@ export async function GET(request: NextRequest) {
     return jsonResponse({ error: "Missing id or url query parameter" }, 400, request);
   }
   if (id.length > MAX_SETLIST_INPUT_LENGTH) {
-    return jsonResponse(
-      {
-        error:
-          "Input too long. Use setlist ID or a shorter setlist.fm URL (max 2000 characters).",
-      },
-      400,
-      request
-    );
+    return jsonResponse({ error: SETLIST_MESSAGES.INPUT_TOO_LONG }, 400, request);
   }
 
   try {
     const result = await handleSetlistProxy(id);
-    const status = "error" in result ? result.status : result.status;
-    const body = "error" in result ? { error: result.error } : result.body;
-    return jsonResponse(body, status, request);
+    if (isErr(result)) {
+      return jsonResponse(result.error.error, result.error.status, request);
+    }
+    return jsonResponse(result.value.body, 200, request);
   } catch {
-    return jsonResponse(
-      { error: "An unexpected error occurred. Please try again." },
-      500,
-      request
-    );
+    return internalError(request);
   }
 }

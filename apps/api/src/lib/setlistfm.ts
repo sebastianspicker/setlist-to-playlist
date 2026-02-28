@@ -1,47 +1,5 @@
 import { SETLIST_FM_BASE_URL } from "@repo/shared";
 
-/** 
- * Extracts the raw setlist ID from either a direct string or a full setlist.fm URL.
- * It strictly validates input formats to avoid sending malformed IDs to the API. 
- */
-export function parseSetlistIdFromInput(idOrUrl: string): string | null {
-  const trimmed = idOrUrl.trim();
-  if (!trimmed) return null;
-
-  if (
-    trimmed.startsWith("http://") ||
-    trimmed.startsWith("https://") ||
-    trimmed.includes("setlist.fm")
-  ) {
-    try {
-      const url = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
-      // Ensure the URL comes exclusively from setlist.fm domains to prevent SSRF vulnerabilities or malformed third-party inputs.
-      if (!url.hostname.toLowerCase().includes("setlist.fm")) return null;
-
-      const path = url.pathname;
-
-      // Attempt to extract the 4-12 character hexadecimal ID directly from standard setlist.fm URL formats (e.g., /setlist/.../63de4613.html)
-      const match = path.match(/-([a-f0-9]{4,12})\.html$/i);
-      if (match) return match[1];
-
-      // Fallback extraction technique: Look at the final segment of the URL path as a last resort.
-      const segment = path.split("/").filter(Boolean).pop() ?? "";
-      const withoutHtml = segment.replace(/\.html$/i, "");
-      const idPart = withoutHtml.split("-").pop();
-      if (idPart && /^[a-f0-9]{4,12}$/i.test(idPart)) return idPart;
-      if (withoutHtml && /^[a-f0-9-]+$/i.test(withoutHtml)) return withoutHtml;
-    } catch {
-      return null;
-    }
-    return null;
-  }
-
-  // Finally, if it isn't a URL, check if the input is just the raw ID string.
-  // We validate it as a 4-64 character alphanumeric sequence containing hyphens.
-  if (/^[a-f0-9-]{4,64}$/i.test(trimmed)) return trimmed;
-  return null;
-}
-
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const cache = new Map<string, { body: unknown; expires: number }>();
 
@@ -70,12 +28,8 @@ function evictExpired(): void {
 }
 
 function setCached(id: string, body: unknown): void {
-  // Prevent Out-Of-Memory (OOM) denial of service by rejecting suspiciously huge JSON payloads.
-  // 500,000 characters translates to roughly 500 KB which is well above any standard setlist JSON.
-  const strBody = JSON.stringify(body);
-  if (strBody.length > 500_000) {
-    return;
-  }
+  // DCI-037: Removed expensive JSON.stringify(body).length check. 
+  // With CACHE_EVICT_THRESHOLD at 200, the risk of OOM from standard setlist JSON is negligible.
 
   cache.set(id, { body, expires: Date.now() + CACHE_TTL_MS });
   if (cache.size > CACHE_EVICT_THRESHOLD) {

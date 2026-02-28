@@ -13,6 +13,7 @@ export function isErrorLike(value: unknown): value is { message: string } {
 /**
  * Extract a safe user-facing message from an unknown error.
  * Uses type guards (Error, isErrorLike) instead of type assertions.
+ * DCI-003: Callers must not throw Error(sensitiveData); this returns err.message as-is.
  */
 export function getErrorMessage(err: unknown, fallback: string): string {
   if (err instanceof Error && err.message) return err.message;

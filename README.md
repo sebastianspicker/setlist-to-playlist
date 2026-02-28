@@ -15,6 +15,25 @@ pnpm dev
 
 Then open the web app at **http://localhost:3000**. The same process runs both the Next.js frontend and the API routes (Developer Token, setlist proxy, health); no separate API server is required for local development.
 
+## Demo
+
+- Live local demo route: `http://localhost:3000/demo`
+- The `/demo` page is static and intended for reproducible screenshots/GitHub previews.
+
+### Screenshots
+
+#### App Home
+
+![App Home](docs/screenshots/github/app-home.png)
+
+#### Demo Flow (Desktop)
+
+![Demo Desktop](docs/screenshots/github/demo-desktop.png)
+
+#### Demo Flow (Mobile)
+
+![Demo Mobile](docs/screenshots/github/demo-mobile.png)
+
 ### Prerequisites
 
 - **Node.js** ≥ 20 (see `engines` in root `package.json`)
@@ -38,9 +57,9 @@ Copy `.env.example` to `.env` in the repo root and set:
 | `packages/core` | Domain logic: setlist parsing, track matching, normalization (no UI). |
 | `packages/shared` | Shared types, utils, constants. |
 | `packages/ui` | Optional design system (placeholder). |
-| `docs/` | Product specs, design docs, tech docs, ADR, execution plans. |
+| `docs/` | Consolidated product spec (PRD), focused design docs, tech docs, ADR, quality findings. |
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for data flow and [CONTRIBUTING.md](CONTRIBUTING.md) for how to contribute.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for data flow and [docs/index.md](docs/index.md) for the docs map.
 
 ## Project Structure
 
@@ -115,16 +134,14 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for data flow and [CONTRIBUTING.md](CONTR
 │       └── src/
 ├── docs/
 │   ├── index.md
-│   ├── product-specs/
-│   ├── design-docs/
+│   ├── product-specs/          # PRD as single source
+│   ├── design-docs/            # UX flows + pointers to design system master
+│   ├── design-system/
 │   ├── tech/
 │   ├── adr/
-│   ├── exec-plans/
-│   └── generated/
+│   └── code-inspection-findings.md
 ├── infra/
-│   ├── deploy/
-│   ├── nginx/
-│   └── terraform/
+│   └── README.md                 # deploy/, nginx/, terraform/ reserved when needed
 └── scripts/
     ├── seed-demo-setlists.ts
     └── export-diagnostics.ts
@@ -141,6 +158,12 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for data flow and [CONTRIBUTING.md](CONTR
 | `pnpm test` | Run tests in all packages. |
 | `pnpm format` | Format code with Prettier. |
 | `pnpm format:check` | Check formatting without writing. |
+
+Optional (run from repo root with `npx tsx`):
+
+- **seed-demo-setlists:** `SETLISTFM_API_KEY=your_key npx tsx scripts/seed-demo-setlists.ts` – fetches demo setlists and writes `scripts/fixtures/demo-setlists.json` for local dev or tests.
+- **export-diagnostics:** `npx tsx scripts/export-diagnostics.ts` or `npx tsx scripts/export-diagnostics.ts --out report.json` – exports non-sensitive env/config info for support or debugging (no secrets).
+- **cleanup-repo:** `bash scripts/cleanup-repo.sh` – removes local non-source artifacts (logs, `.DS_Store`, build caches) without touching tracked source files.
 
 ## License
 

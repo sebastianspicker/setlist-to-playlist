@@ -1,45 +1,80 @@
 "use client";
 
-import { useState } from "react";
-import type { Setlist } from "@repo/core";
+import { useEffect, useMemo, useState } from "react";
+import { buildPlaylistName, dedupeTrackIdsOrdered } from "@repo/core";
 import { getErrorMessage } from "@repo/shared";
-import type { MatchRow } from "@/features/matching/MatchingView";
+import type { MatchRow } from "@/features/matching/types";
 import {
   isMusicKitAuthorized,
   createLibraryPlaylist,
   addTracksToLibraryPlaylist,
 } from "@/lib/musickit";
 import { ErrorAlert } from "@/components/ErrorAlert";
+import { LoadingButton } from "@/components/LoadingButton";
 import { SectionTitle } from "@/components/SectionTitle";
 import { ConnectAppleMusic } from "@/features/matching/ConnectAppleMusic";
+import type { Setlist } from "@repo/core";
 
 export interface CreatePlaylistViewProps {
   setlist: Setlist;
   matchRows: MatchRow[];
 }
 
-function buildPlaylistName(setlist: Setlist): string {
-  const parts = ["Setlist", setlist.artist, setlist.eventDate].filter(
-    (p) => p != null && String(p).trim() !== ""
-  );
-  return parts.length > 0 ? parts.join(" – ") : "Setlist";
+interface ResumeState {
+  id: string;
+  url?: string;
+  remainingIds: string[];
 }
 
-/**
- * Renders the final stage of the application where matched tracks are committed to the user's Apple Music Library.
- * It handles the MusicKit authorization flow gracefully before making the API calls to progressively save the playlist.
- */
+function resumeKey(setlistId: string): string {
+  return `playlist_resume_v1:${setlistId}`;
+}
+
+function readResume(setlistId: string): ResumeState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(resumeKey(setlistId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ResumeState;
+    if (!parsed?.id || !Array.isArray(parsed?.remainingIds)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeResume(setlistId: string, value: ResumeState | null): void {
+  if (typeof window === "undefined") return;
+  const key = resumeKey(setlistId);
+  if (!value) {
+    window.sessionStorage.removeItem(key);
+    return;
+  }
+  window.sessionStorage.setItem(key, JSON.stringify(value));
+}
+
 export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<{ id: string; url?: string } | null>(null);
   const [needsAuth, setNeedsAuth] = useState(false);
-
-  // Tracks if the playlist container was successfully created but individual sub-tracks failed to append.
-  // This allows the user to safely retry adding only the tracks without duplicating the empty playlist container.
   const [addTracksError, setAddTracksError] = useState<string | null>(null);
+  const [dedupeTracks, setDedupeTracks] = useState(false);
+  const [resumeState, setResumeState] = useState<ResumeState | null>(null);
 
-  const songIds = matchRows.map((r) => r.appleTrack?.id).filter(Boolean) as string[];
+  useEffect(() => {
+    setResumeState(readResume(setlist.id));
+  }, [setlist.id]);
+
+  const selectedSongIds = useMemo(
+    () => matchRows.map((r) => r.appleTrack?.id).filter(Boolean) as string[],
+    [matchRows]
+  );
+
+  const songIds = useMemo(
+    () => (dedupeTracks ? dedupeTrackIdsOrdered(selectedSongIds) : selectedSongIds),
+    [dedupeTracks, selectedSongIds]
+  );
 
   async function handleCreate() {
     setError(null);
@@ -50,23 +85,26 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
       const authorized = await isMusicKitAuthorized();
       if (!authorized) {
         setNeedsAuth(true);
-        setLoading(false);
         return;
       }
 
       if (songIds.length === 0) {
         setError("No tracks to add. Match at least one track first.");
-        setLoading(false);
         return;
       }
 
       const name = buildPlaylistName(setlist);
       const { id, url } = await createLibraryPlaylist(name);
+      setCreated({ id, url });
+
       try {
         await addTracksToLibraryPlaylist(id, songIds);
-        setCreated({ id, url });
+        setResumeState(null);
+        writeResume(setlist.id, null);
       } catch (addErr) {
-        setCreated({ id, url });
+        const resume: ResumeState = { id, url, remainingIds: [...songIds] };
+        setResumeState(resume);
+        writeResume(setlist.id, resume);
         setAddTracksError(getErrorMessage(addErr, "Adding tracks failed."));
       }
     } catch (err) {
@@ -76,16 +114,15 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
     }
   }
 
-  /**
-   * Safe retry mechanism: Sends all song IDs again.
-   * Apple Music API add-track endpoints are idempotent per track, preventing duplicate items from stacking.
-   */
   async function handleAddRemainingTracks() {
-    if (!created || songIds.length === 0) return;
+    const target = resumeState ?? (created ? { ...created, remainingIds: [...songIds] } : null);
+    if (!target || target.remainingIds.length === 0) return;
     setAddTracksError(null);
     setLoading(true);
     try {
-      await addTracksToLibraryPlaylist(created.id, songIds);
+      await addTracksToLibraryPlaylist(target.id, target.remainingIds);
+      setResumeState(null);
+      writeResume(setlist.id, null);
       setAddTracksError(null);
     } catch (err) {
       setAddTracksError(getErrorMessage(err, "Adding tracks failed."));
@@ -99,36 +136,27 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
     await handleCreate();
   }
 
-  if (created) {
-    const rawUrl = created.url?.trim();
-    const isSafeUrl =
-      rawUrl &&
-      (rawUrl.startsWith("http://") || rawUrl.startsWith("https://"));
+  if (created || resumeState) {
+    const current = resumeState ?? created;
+    const rawUrl = current?.url?.trim();
+    const isSafeUrl = rawUrl && (rawUrl.startsWith("http://") || rawUrl.startsWith("https://"));
     return (
-      <div
-        role="status"
-        className="glass-panel"
-        style={{
-          marginTop: "1.5rem",
-          background: "rgba(16, 185, 129, 0.1)",
-          borderColor: "var(--success)",
-        }}
-      >
-        <p style={{ margin: 0, fontWeight: 600, color: "var(--success)" }}>Playlist created.</p>
+      <div role="status" className="glass-panel success-panel">
+        <p className="success-title">Playlist created.</p>
         {addTracksError ? (
           <>
-            <p style={{ margin: "0.5rem 0 0", color: "var(--danger)" }}>
+            <p className="error-text" style={{ marginTop: "0.5rem" }}>
               Playlist was created but adding tracks failed: {addTracksError}
             </p>
-            <button
-              type="button"
-              className="premium-button secondary"
+            <LoadingButton
+              variant="secondary"
               onClick={handleAddRemainingTracks}
-              disabled={loading}
+              loading={loading}
+              loadingChildren="Adding…"
               style={{ marginTop: "1rem" }}
             >
-              {loading ? "Adding…" : "Add tracks to this playlist"}
-            </button>
+              Resume adding remaining tracks
+            </LoadingButton>
           </>
         ) : (
           <>
@@ -144,7 +172,7 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
                 </a>
               </p>
             ) : (
-              <p style={{ margin: "0.5rem 0 0", color: "var(--text-muted)" }}>
+              <p className="muted-block" style={{ marginTop: "0.5rem" }}>
                 Open the Apple Music app and check your library for the new playlist.
               </p>
             )}
@@ -155,17 +183,31 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
   }
 
   const count = matchRows.filter((m) => m.appleTrack !== null).length;
+  const dedupeSavings = selectedSongIds.length - songIds.length;
 
   return (
     <section aria-label="Create playlist" className="glass-panel" style={{ marginTop: "2rem" }}>
       <SectionTitle>Create playlist</SectionTitle>
-      <p style={{ color: "var(--text-main)" }}>
-        Ready to create a playlist with <strong style={{ color: "var(--accent-primary)" }}>{count}</strong> track{count !== 1 ? "s" : ""}.
+      <p>
+        Ready to create a playlist with{" "}
+        <strong className="accent-inline">{count}</strong> track{count !== 1 ? "s" : ""}.
       </p>
+
+      <label className="checkbox-row">
+        <input
+          type="checkbox"
+          checked={dedupeTracks}
+          onChange={(e) => setDedupeTracks(e.target.checked)}
+        />
+        Remove duplicate tracks before export
+      </label>
+      {dedupeTracks && dedupeSavings > 0 && (
+        <p className="muted-caption">Deduplication will remove {dedupeSavings} duplicate track(s).</p>
+      )}
 
       {needsAuth && (
         <div style={{ marginTop: "1.5rem" }}>
-          <p style={{ color: "var(--danger)", marginBottom: "0.75rem" }}>
+          <p className="error-text" style={{ marginBottom: "0.75rem" }}>
             Connect Apple Music to create the playlist in your library.
           </p>
           <ConnectAppleMusic onAuthorized={handleAuthorized} label="Connect Apple Music" />
@@ -173,15 +215,16 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
       )}
 
       {!needsAuth && (
-        <button
-          type="button"
-          className="premium-button"
+        <LoadingButton
           onClick={handleCreate}
-          disabled={loading || count === 0}
+          disabled={count === 0}
+          loading={loading}
+          loadingChildren="Creating…"
           style={{ marginTop: "1.5rem" }}
+          title="Create a new playlist in your Apple Music library with the matched tracks"
         >
-          {loading ? "Creating…" : "Create playlist"}
-        </button>
+          Create playlist
+        </LoadingButton>
       )}
 
       {error && (
@@ -189,7 +232,7 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
           message={error}
           onRetry={() => {
             setError(null);
-            handleCreate();
+            void handleCreate();
           }}
           retryLabel="Retry create playlist"
         />

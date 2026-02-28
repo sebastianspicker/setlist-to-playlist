@@ -15,8 +15,6 @@ Setlist to Playlist is a PWA that turns a setlist from [setlist.fm](https://www.
 
 Concert-goers and fans want to listen to the exact setlist of a show. setlist.fm holds crowd-sourced setlists, but turning that into a playable playlist (e.g. in Apple Music) is manual and tedious. We want one flow: paste a setlist URL or ID, review and optionally fix track matches, then create the playlist in the user's Apple Music library.
 
-See [Problem Statement](problem-statement.md) for the full text.
-
 ---
 
 ## Users
@@ -39,8 +37,6 @@ See [Problem Statement](problem-statement.md) for the full text.
 - Persisting setlists or playlists on our side; no user accounts on our platform.
 - Offline creation of playlists (export requires network and Apple Music auth).
 
-See [MVP Scope](mvp-scope.md) for details.
-
 ---
 
 ## User Stories
@@ -50,7 +46,13 @@ See [MVP Scope](mvp-scope.md) for details.
 - As a user, I can create an Apple Music playlist with the matched tracks in setlist order.
 - As a user, I am not required to create an account on our service; I use my Apple Music account only.
 
-See [User Stories](user-stories.md).
+## New User Onboarding (first-session expectations)
+
+1. Open app and read short 4-step explanation.
+2. Paste setlist URL or ID.
+3. Review imported setlist and continue to matching.
+4. Connect Apple Music when needed.
+5. Create playlist and optionally open it in Apple Music.
 
 ---
 
@@ -69,7 +71,13 @@ See [User Stories](user-stories.md).
 
 - User can complete the flow (import → preview → match → export) for a typical setlist in under a few minutes.
 - No secrets (API keys, Apple private key) exposed to the client.
-- Completion rate, time to playlist, match quality, and reliability as in [Success Metrics](success-metrics.md).
+
+### Success Metrics
+
+- **Completion rate:** % of users who start (enter URL) and finish (playlist created).
+- **Time to playlist:** Median time from URL entry to playlist created.
+- **Match quality:** % of tracks auto-matched without user correction (informational; corrections are expected).
+- **Reliability:** API uptime and setlist-proxy success rate.
 
 ---
 
@@ -93,6 +101,6 @@ See [User Stories](user-stories.md).
 ## References
 
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) – Components, data flow, token handling
-- [Product specs](.) – problem statement, MVP scope, user stories, success metrics
+- [Product specs index](./index.md)
 - [Tech docs](../tech/) – frontend, backend, Apple Music, setlist.fm, security, reliability
 - [ADR 0001 – Stack (Next.js + MusicKit)](../adr/0001-stack-nextjs-musickit.md)

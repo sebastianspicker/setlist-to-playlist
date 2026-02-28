@@ -69,6 +69,8 @@ temp/
 *.webmanifest.bak
 
 # Ralph Audit / Fixes (moved under docs/audit, docs/fixes)
+docs/audit/*.log
+docs/fixes/*.log
 docs/audit/.last-message.md
 docs/audit/.last-story
 docs/audit/.model-check.log

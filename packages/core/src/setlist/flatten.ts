@@ -11,7 +11,9 @@ export function flattenSetlistToEntries(setlist: Setlist): SetlistEntry[] {
     if (!Array.isArray(set)) continue;
     for (const entry of set) {
       if (entry == null || typeof entry !== "object") continue;
-      entries.push({ ...entry, artist: entry.artist ?? artist });
+      const name = "name" in entry && typeof entry.name === "string" ? entry.name : "";
+      const info = "info" in entry && typeof entry.info === "string" ? entry.info : undefined;
+      entries.push({ name, artist: ("artist" in entry && typeof entry.artist === "string" ? entry.artist : undefined) ?? artist, info });
     }
   }
   return entries;

@@ -28,4 +28,14 @@ describe("normalizeTrackName", () => {
   it("normalizes spaces", () => {
     expect(normalizeTrackName("  Hello   World  ")).toBe("Hello World");
   });
+
+  it("preserves valid parentheses (DCI-061)", () => {
+    expect(normalizeTrackName("(Don't Fear) The Reaper")).toBe("(Don't Fear) The Reaper");
+    expect(normalizeTrackName("Interstate Love Song (2019 Remastered)")).toBe("Interstate Love Song");
+  });
+
+  it("refines feat. removal to preserve trailing metadata (DCI-063)", () => {
+    expect(normalizeTrackName("Song feat. Artist A (live)")).toBe("Song");
+    expect(normalizeTrackName("Song feat. Artist A - Radio Edit")).toBe("Song Radio Edit");
+  });
 });

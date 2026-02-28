@@ -1,6 +1,7 @@
+import type { DevTokenResponse } from "@repo/shared";
 import { signDeveloperToken } from "../../lib/jwt.js";
 
-export type DevTokenResponse = { token: string } | { error: string };
+export type { DevTokenResponse };
 
 /**
  * Mint Apple Developer Token (JWT) for MusicKit.
@@ -24,7 +25,13 @@ export async function handleDevToken(): Promise<DevTokenResponse> {
       privateKeyPem: privateKey,
     });
     return { token };
-  } catch {
+  } catch (err) {
+    // DCI-015: Log signing error safely on the server. Do NOT log the 'privateKey' itself.
+    console.error("Apple Developer Token signing failed:", {
+      teamId,
+      keyId,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return { error: "Token signing failed. Check server configuration and logs." };
   }
 }

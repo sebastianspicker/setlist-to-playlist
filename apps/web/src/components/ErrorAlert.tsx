@@ -5,6 +5,16 @@
  * Designed to be used within smaller sections of the UI that fail to load or process.
  */
 
+function isLikelyNetworkError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("failed to fetch") ||
+    lower.includes("networkerror") ||
+    lower.includes("load failed") ||
+    lower.includes("network request failed")
+  );
+}
+
 export interface ErrorAlertProps {
   message: string;
   onRetry: () => void;
@@ -13,6 +23,7 @@ export interface ErrorAlertProps {
 }
 
 export function ErrorAlert({ message, onRetry, retryLabel = "Try again" }: ErrorAlertProps) {
+  const showOfflineHint = isLikelyNetworkError(message);
   return (
     <div
       role="alert"
@@ -26,6 +37,11 @@ export function ErrorAlert({ message, onRetry, retryLabel = "Try again" }: Error
       }}
     >
       <p style={{ margin: 0 }}>{message}</p>
+      {showOfflineHint && (
+        <p style={{ margin: "0.35rem 0 0", fontSize: "0.9em", opacity: 0.9 }}>
+          Offline? Check your connection and try again.
+        </p>
+      )}
       <button
         type="button"
         onClick={onRetry}

@@ -4,15 +4,18 @@ import type { NextRequest } from "next/server";
  * Shared CORS helper for API routes (DCI-044).
  * Set ALLOWED_ORIGIN in production; when unset, only localhost/127.0.0.1 are allowed (DCI-001). DCI-037: trim and use single origin.
  * DCI-062: Strip trailing slash from configured origin so it matches browser Origin (no path).
+ * DCI-002: Reject "*" to avoid allowing any origin (insecure).
  */
 export function getAllowOrigin(origin: string | null): string | null {
   const configured = (process.env.ALLOWED_ORIGIN ?? "").trim();
   const isLocalOrigin =
     origin &&
+    origin !== "null" &&
     (origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1"));
   if (configured) {
     const single = configured.split(",")[0].trim().replace(/\/$/, "");
-    return single || null;
+    if (!single || single === "null" || single === "*") return null;
+    return single;
   }
   return isLocalOrigin ? origin : null;
 }

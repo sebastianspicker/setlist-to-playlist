@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "Setlist to Playlist",
   description: "Import a setlist from setlist.fm and create an Apple Music playlist.",
   manifest: "/manifest.webmanifest",
+  referrer: 'no-referrer-when-downgrade',
 };
 
 /**
