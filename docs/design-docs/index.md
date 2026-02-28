@@ -1,6 +1,6 @@
 # Design Docs
 
-- [Core Beliefs](core-beliefs.md)
 - [UX Flows](ux-flows.md)
-- [Wireframes](wireframes.md)
-- [Design System](design-system.md)
+- [Design System Master](../design-system/MASTER.md)
+
+Design docs are intentionally lean. Keep only implementation-driving artifacts here.

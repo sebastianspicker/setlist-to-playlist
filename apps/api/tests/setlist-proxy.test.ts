@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { parseSetlistIdFromInput } from "../src/lib/setlistfm.js";
+import { parseSetlistIdFromInput } from "@repo/core";
+import { API_ERROR, isErr, isOk } from "@repo/shared";
 import { handleSetlistProxy } from "../src/routes/setlist/proxy.js";
 import { saveEnv, restoreEnv } from "./helpers/env.js";
 
@@ -31,6 +32,12 @@ describe("parseSetlistIdFromInput", () => {
     expect(parseSetlistIdFromInput("   ")).toBeNull();
     expect(parseSetlistIdFromInput("not-a-valid-id!!!")).toBeNull();
   });
+
+  it("returns null for malicious SSRF hostnames (DCI-060)", () => {
+    expect(parseSetlistIdFromInput("https://setlist.fm.evil.com/setlist/a/b-c1.html")).toBeNull();
+    expect(parseSetlistIdFromInput("https://evilsetlist.fm/setlist/a/b-c1.html")).toBeNull();
+    expect(parseSetlistIdFromInput("https://setlist.fm@evil.com/setlist/a/b-c1.html")).toBeNull();
+  });
 });
 
 describe("handleSetlistProxy", () => {
@@ -48,15 +55,23 @@ describe("handleSetlistProxy", () => {
   it("returns 503 when SETLISTFM_API_KEY is not set", async () => {
     delete process.env.SETLISTFM_API_KEY;
     const result = await handleSetlistProxy("63de4613");
-    expect("error" in result && result.status).toBe(503);
-    expect("error" in result && result.error).toContain("API key");
+    expect(isErr(result)).toBe(true);
+    if (isErr(result)) {
+      expect(result.error.status).toBe(503);
+      expect(result.error.error.error).toContain("API key");
+      expect(result.error.error.code).toBe(API_ERROR.SERVICE_UNAVAILABLE);
+    }
   });
 
   it("returns 400 when id/url is invalid", async () => {
     process.env.SETLISTFM_API_KEY = "test-key";
     const result = await handleSetlistProxy("!!!");
-    expect("error" in result && result.status).toBe(400);
-    expect("error" in result && result.error).toContain("Invalid");
+    expect(isErr(result)).toBe(true);
+    if (isErr(result)) {
+      expect(result.error.status).toBe(400);
+      expect(result.error.error.error).toContain("Invalid");
+      expect(result.error.error.code).toBe(API_ERROR.BAD_REQUEST);
+    }
   });
 
   it("returns setlist body when fetch succeeds (mocked)", async () => {
@@ -78,10 +93,9 @@ describe("handleSetlistProxy", () => {
     );
 
     const result = await handleSetlistProxy("63de4613");
-    expect("body" in result).toBe(true);
-    if ("body" in result) {
-      expect(result.body).toEqual(mockSetlist);
-      expect(result.status).toBe(200);
+    expect(isOk(result)).toBe(true);
+    if (isOk(result)) {
+      expect(result.value.body).toEqual(mockSetlist);
     }
   });
 
@@ -100,8 +114,11 @@ describe("handleSetlistProxy", () => {
     );
 
     const result = await handleSetlistProxy("deadbeef"); // valid ID format, API returns 404
-    expect("error" in result).toBe(true);
-    expect("error" in result && result.status).toBe(404);
+    expect(isErr(result)).toBe(true);
+    if (isErr(result)) {
+      expect(result.error.status).toBe(404);
+      expect(result.error.error.code).toBe(API_ERROR.NOT_FOUND);
+    }
   });
 
   it("returns rate-limit message on 429 after retries", async () => {
@@ -119,8 +136,11 @@ describe("handleSetlistProxy", () => {
     );
 
     const result = await handleSetlistProxy("63de4614"); // different ID so cache is not used
-    expect("error" in result).toBe(true);
-    expect("error" in result && result.status).toBe(429);
-    expect("error" in result && result.error).toMatch(/rate limit/i);
+    expect(isErr(result)).toBe(true);
+    if (isErr(result)) {
+      expect(result.error.status).toBe(429);
+      expect(result.error.error.error).toMatch(/rate limit|too many requests/i);
+      expect(result.error.error.code).toBe(API_ERROR.RATE_LIMIT);
+    }
   });
 });

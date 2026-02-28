@@ -6,14 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint src tests next.config.ts --ext .ts,.tsx --max-warnings=0",
     "test": "vitest run"
   },
   "dependencies": {
     "@repo/core": "workspace:*",
     "@repo/shared": "workspace:*",
+    "@repo/ui": "workspace:*",
     "api": "workspace:*",
-    "next": "^15.0.3",
+    "next": "^16.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
@@ -22,7 +23,7 @@
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.2",
     "eslint": "^9.16.0",
-    "eslint-config-next": "^15.0.3",
+    "eslint-config-next": "^16.0.0",
     "typescript": "^5.7.2",
     "vitest": "^2.1.6"
   }

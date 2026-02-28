@@ -4,9 +4,16 @@ export const API_ERROR = {
   RATE_LIMIT: "RATE_LIMIT",
   NOT_FOUND: "NOT_FOUND",
   BAD_REQUEST: "BAD_REQUEST",
+  INTERNAL: "INTERNAL",
+  SERVICE_UNAVAILABLE: "SERVICE_UNAVAILABLE",
 } as const;
 
 export type ApiErrorCode = (typeof API_ERROR)[keyof typeof API_ERROR];
+
+export interface ApiErrorPayload {
+  error: string;
+  code?: ApiErrorCode;
+}
 
 /**
  * Discriminated union for success vs error results (generic, reusable).

@@ -4,8 +4,8 @@
   "description": "Import a setlist from setlist.fm and create an Apple Music playlist.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000",
+  "background_color": "#121212",
+  "theme_color": "#1a1a1a",
   "icons": [
     {
       "src": "/icons/icon-192.png",

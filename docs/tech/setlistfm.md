@@ -20,8 +20,8 @@ Reference: [setlist.fm API documentation](https://api.setlist.fm/docs/1.0/index.
 
 ## Caching / Backoff
 
-- **Caching:** Optional in our proxy. Cache setlist response by ID with a short TTL (e.g. 1 hour) to reduce calls and protect the API key.
-- **Rate limits:** setlist.fm enforces rate limits. On 429, implement exponential backoff and return a clear message to the user.
+- **Caching:** The proxy caches setlist responses by ID in memory: TTL 1 hour, eviction when the cache exceeds 200 entries (expired entries removed first). This reduces outbound calls and helps stay within rate limits.
+- **Rate limits:** setlist.fm enforces rate limits. On 429, the proxy retries with backoff and returns a clear message to the user.
 - **API key:** Pass as `x-api-key` (or per setlist.fm docs). Never expose in the client; use the proxy so the key stays server-side.
 
 ## Test setlist ID (for manual or integration checks)

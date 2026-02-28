@@ -1,10 +1,11 @@
 import Link from "next/link";
+import { mainContainerStyle } from "@/lib/styles";
 
 export default function NotFound() {
   return (
-    <main id="main" style={{ padding: "2rem", maxWidth: "40rem", margin: "0 auto", fontFamily: "system-ui, sans-serif" }}>
+    <main id="main" style={mainContainerStyle}>
       <h1>Page not found</h1>
-      <p style={{ color: "#666", marginTop: "0.5rem" }}>
+      <p style={{ color: "var(--text-muted)", marginTop: "0.5rem" }}>
         The page you’re looking for doesn’t exist or has been moved.
       </p>
       <Link

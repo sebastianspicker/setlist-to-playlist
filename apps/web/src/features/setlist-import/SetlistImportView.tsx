@@ -1,18 +1,17 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { mapSetlistFmToSetlist } from "@repo/core";
-import type { Setlist } from "@repo/core";
-import type { SetlistFmResponse } from "@repo/core";
-import { getErrorMessage, MAX_SETLIST_INPUT_LENGTH } from "@repo/shared";
-import { setlistProxyUrl } from "@/lib/api";
+import { useState } from "react";
+import { FlowStepIndicator } from "@/components/FlowStepIndicator";
 import { ErrorAlert } from "@/components/ErrorAlert";
+import { LoadingButton } from "@/components/LoadingButton";
 import { SectionTitle } from "@/components/SectionTitle";
+import { StatusText } from "@/components/StatusText";
 import { ConnectAppleMusic } from "@/features/matching/ConnectAppleMusic";
 import { MatchingView } from "@/features/matching/MatchingView";
-import type { MatchRow } from "@/features/matching/MatchingView";
+import type { MatchRow } from "@/features/matching/types";
 import { CreatePlaylistView } from "@/features/playlist-export/CreatePlaylistView";
 import { SetlistPreview } from "./SetlistPreview";
+import { useSetlistImportState } from "./useSetlistImportState";
 
 function ConnectAppleMusicInline() {
   return <ConnectAppleMusic label="Connect Apple Music" />;
@@ -20,109 +19,48 @@ function ConnectAppleMusicInline() {
 
 type Step = "import" | "preview" | "matching" | "export";
 
-/**
- * Main View Component for importing a Setlist from setlist.fm.
- * It manages the user input, loading states, error boundaries, 
- * and sequence orchestration leading into the track matching phase.
- */
 export function SetlistImportView() {
-  const [inputValue, setInputValue] = useState("");
-  const [setlist, setSetlist] = useState<Setlist | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    inputValue,
+    setInputValue,
+    setlist,
+    loading,
+    error,
+    history,
+    loadSetlist,
+    retryLast,
+    selectHistoryItem,
+    clearHistory,
+  } = useSetlistImportState();
   const [step, setStep] = useState<Step>("import");
   const [matchRows, setMatchRows] = useState<MatchRow[] | null>(null);
 
-  // References to handle race conditions during rapid consecutive network requests.
-  // The AbortController actively cancels in-flight duplicate requests if a user types too quickly.
-  const currentRequestRef = useRef<string | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  async function loadSetlist(trimmed: string) {
-    setError(null);
-    if (trimmed.length > MAX_SETLIST_INPUT_LENGTH) {
-      setError(
-        "Input is too long. Please paste the setlist ID only (e.g. 63de4613) or a shorter URL from setlist.fm."
-      );
-      return;
-    }
-    abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
-    const signal = abortControllerRef.current.signal;
-    currentRequestRef.current = trimmed;
-    setLoading(true);
-    try {
-      const url = setlistProxyUrl(`id=${encodeURIComponent(trimmed)}`);
-      const res = await fetch(url, { signal });
-      let data: { error?: string } | SetlistFmResponse;
-      try {
-        data = (await res.json()) as { error?: string } | SetlistFmResponse;
-      } catch {
-        if (currentRequestRef.current !== trimmed) return;
-        setError("The server returned an invalid response. Please try again or check the URL.");
-        setSetlist(null);
-        return;
-      }
-
-      if (currentRequestRef.current !== trimmed) return;
-
-      if (!res.ok || "error" in data) {
-        const message =
-          (data as { error?: string }).error ?? `Request failed (${res.status})`;
-        setError(message);
-        setSetlist(null);
-        return;
-      }
-
-      const mapped = mapSetlistFmToSetlist(data as SetlistFmResponse);
-      setSetlist(mapped);
-      setStep("preview");
-    } catch (err) {
-      if ((err as { name?: string })?.name === "AbortError") return;
-      if (currentRequestRef.current !== trimmed) return;
-      setError(getErrorMessage(err, "Network error"));
-      setSetlist(null);
-    } finally {
-      if (currentRequestRef.current === trimmed) {
-        setLoading(false);
-        currentRequestRef.current = null;
-      }
-    }
-  }
-
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const trimmed = inputValue.trim();
-    if (trimmed) loadSetlist(trimmed);
-  }
-
-  function handleRetry() {
-    const trimmed = inputValue.trim();
-    if (trimmed) loadSetlist(trimmed);
-  }
-
-  function goToMatching() {
-    setStep("matching");
+    const ok = await loadSetlist(inputValue);
+    if (ok) setStep("preview");
   }
 
   if (step === "matching" && setlist) {
     return (
-      <section style={{ marginTop: "1.5rem" }}>
+      <section className="step-section">
+        <FlowStepIndicator step={3} total={4} label="Matching" />
+        {inputValue.trim() && (
+          <p className="muted-caption">
+            Setlist: {inputValue.length > 50 ? `${inputValue.slice(0, 50)}…` : inputValue}
+          </p>
+        )}
         <button
           type="button"
           onClick={() => setStep("preview")}
           aria-label="Back to setlist preview"
           className="premium-button secondary"
-          style={{ marginBottom: "1rem", padding: "0.35rem 0.75rem", fontSize: "0.9rem" }}
         >
           ← Back to preview
         </button>
-        <p style={{ color: "var(--text-main)", marginBottom: "0.5rem" }}>
+        <p className="muted-block" style={{ marginTop: "0.75rem" }}>
           Setlist: <strong>{setlist.artist}</strong>
-          {setlist.venue && ` at ${setlist.venue}`} — {(setlist.sets ?? []).flat().length} tracks.
-        </p>
-        <p style={{ color: "var(--text-muted)", fontSize: "0.9em", marginBottom: "0.5rem" }}>
-          Connect Apple Music to search for tracks (required for suggestions).
+          {setlist.venue ? ` at ${setlist.venue}` : ""} — {(setlist.sets ?? []).flat().length} tracks.
         </p>
         <ConnectAppleMusicInline />
         <MatchingView
@@ -138,13 +76,18 @@ export function SetlistImportView() {
 
   if (step === "export" && setlist && matchRows) {
     return (
-      <section style={{ marginTop: "1.5rem" }}>
+      <section className="step-section">
+        <FlowStepIndicator step={4} total={4} label="Export" />
+        {inputValue.trim() && (
+          <p className="muted-caption">
+            Setlist: {inputValue.length > 50 ? `${inputValue.slice(0, 50)}…` : inputValue}
+          </p>
+        )}
         <button
           type="button"
           onClick={() => setStep("matching")}
           aria-label="Back to matching"
           className="premium-button secondary"
-          style={{ marginBottom: "1rem", padding: "0.35rem 0.75rem", fontSize: "0.9rem" }}
         >
           ← Back to matching
         </button>
@@ -154,15 +97,17 @@ export function SetlistImportView() {
   }
 
   return (
-    <section aria-label="Import setlist" className="glass-panel" style={{ marginTop: "2rem" }}>
+    <section aria-label="Import setlist" className="glass-panel import-panel">
+      <FlowStepIndicator step={step === "preview" ? 2 : 1} total={4} label={step === "preview" ? "Preview" : "Import"} />
       <SectionTitle>Import</SectionTitle>
-      <p style={{ marginBottom: "1.5rem", color: "var(--text-muted)" }}>
-        Enter a setlist.fm URL or setlist ID (e.g. <code style={{ color: "var(--accent-primary)" }}>63de4613</code>).
+      <p className="muted-block">
+        Enter a setlist.fm URL or setlist ID (e.g.{" "}
+        <code className="accent-inline">63de4613</code>).
       </p>
 
-      <form onSubmit={handleSubmit} style={{ marginBottom: "1.5rem", display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "flex-end" }}>
-        <div style={{ flex: "1 1 auto", minWidth: "200px", maxWidth: "28rem" }}>
-          <label htmlFor="setlist-input" style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "var(--text-main)" }}>
+      <form onSubmit={handleSubmit} className="import-form">
+        <div className="import-input-wrap">
+          <label htmlFor="setlist-input" className="input-label">
             Setlist URL or ID
           </label>
           <input
@@ -177,35 +122,64 @@ export function SetlistImportView() {
             aria-describedby={error ? "setlist-error" : undefined}
           />
         </div>
-        <button
+        <LoadingButton
           type="submit"
-          className="premium-button"
-          disabled={loading || !inputValue.trim()}
+          loading={loading}
+          loadingChildren="Loading…"
+          disabled={!inputValue.trim()}
           style={{ height: "46px" }}
+          title="Fetch setlist from setlist.fm"
         >
-          {loading ? "Loading…" : "Load setlist"}
-        </button>
+          Load setlist
+        </LoadingButton>
       </form>
 
+      {history.length > 0 && (
+        <div className="history-panel">
+          <div className="history-header">
+            <strong>Recent imports</strong>
+            <button type="button" className="premium-button secondary mini" onClick={clearHistory}>
+              Clear
+            </button>
+          </div>
+          <ul className="history-list">
+            {history.map((item) => (
+              <li key={item}>
+                <button
+                  type="button"
+                  className="history-item-button"
+                  onClick={() => selectHistoryItem(item)}
+                  title={item}
+                >
+                  {item}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {loading && (
-        <p role="status" aria-live="polite" style={{ color: "var(--accent-primary)", fontWeight: 500 }}>
+        <StatusText style={{ color: "var(--accent-primary)", fontWeight: 500, marginTop: "0.5rem" }}>
           Loading setlist…
-        </p>
+        </StatusText>
       )}
 
       {error && (
         <div id="setlist-error">
-          <ErrorAlert message={error} onRetry={handleRetry} retryLabel="Retry load setlist" />
+          <ErrorAlert message={error} onRetry={retryLast} retryLabel="Retry load setlist" />
         </div>
       )}
 
       {setlist && step === "preview" && (
         <>
+          <FlowStepIndicator step={2} total={4} label="Preview" />
+          {inputValue.trim() && <p className="muted-caption">Setlist: {inputValue}</p>}
           <SetlistPreview setlist={setlist} />
           <button
             type="button"
             className="premium-button"
-            onClick={goToMatching}
+            onClick={() => setStep("matching")}
             style={{ marginTop: "1.5rem" }}
           >
             Continue to Matching →

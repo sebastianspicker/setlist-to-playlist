@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@repo/core": "workspace:*",
     "@repo/shared": "workspace:*",
     "jose": "^6.0.11"
   },

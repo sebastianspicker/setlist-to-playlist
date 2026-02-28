@@ -10,10 +10,3 @@ export const mainContainerStyle: CSSProperties = {
   margin: "0 auto",
   minWidth: 0,
 };
-
-export const primaryButtonStyle: CSSProperties = {
-  padding: "0.5rem 1rem",
-  fontSize: "1rem",
-  fontWeight: 600,
-  cursor: "pointer",
-};
