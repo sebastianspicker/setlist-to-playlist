@@ -15,6 +15,9 @@ export function proxy(_request: NextRequest) {
     connect-src 'self' https://api.music.apple.com https://*.setlist.fm;
     frame-ancestors 'none';
     form-action 'self';
+    base-uri 'self';
+    object-src 'none';
+    upgrade-insecure-requests;
   `
     .replace(/\s{2,}/g, " ")
     .trim();
