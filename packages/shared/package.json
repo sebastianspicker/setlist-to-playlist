@@ -18,8 +18,8 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@types/node": "^22.10.1",
+    "@types/node": "^25.5.0",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.6"
+    "vitest": "^4.1.0"
   }
 }
