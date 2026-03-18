@@ -1,4 +1,4 @@
-import type { AppleTrack } from "@repo/core";
+import type { AppleTrack } from '@repo/core';
 
 /** Apple Music catalog track; single source of truth from @repo/core AppleTrack. */
 export type AppleMusicTrack = AppleTrack;

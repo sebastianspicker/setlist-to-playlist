@@ -1,6 +1,6 @@
 # Terms of Use
 
-*Placeholder. Replace with your actual terms of use.*
+_Placeholder. Replace with your actual terms of use._
 
 By using this application you agree to:
 

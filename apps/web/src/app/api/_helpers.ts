@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
-import { API_ERROR, type ApiErrorPayload } from "@repo/shared";
-import { corsHeadersForOptions } from "@/lib/cors";
-import { jsonResponse } from "@/lib/api-response";
+import { NextRequest, NextResponse } from 'next/server';
+import { API_ERROR, type ApiErrorPayload } from '@repo/shared';
+import { corsHeadersForOptions } from '@/lib/cors';
+import { jsonResponse } from '@/lib/api-response';
 
 export function optionsNoContent(request: NextRequest): NextResponse {
   return new NextResponse(null, {
@@ -12,7 +12,7 @@ export function optionsNoContent(request: NextRequest): NextResponse {
 
 export function internalError(
   request: NextRequest,
-  message = "An unexpected error occurred. Please try again."
+  message = 'An unexpected error occurred. Please try again.'
 ): NextResponse {
   const payload: ApiErrorPayload = { error: message, code: API_ERROR.INTERNAL };
   return jsonResponse(payload, 500, request);

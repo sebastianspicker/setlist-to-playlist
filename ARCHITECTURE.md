@@ -30,7 +30,7 @@ In this repo, the **web app** (Next.js) serves both the PWA and the API. The API
 
 ## Flows
 
-1. **Import:** User enters setlist.fm URL or setlist ID → frontend (or API proxy) calls setlist.fm → setlist data (artist, venue, date, tracks) is shown.
+1. **Import:** User enters setlist.fm URL or setlist ID → frontend calls our API proxy (`/api/setlist/proxy`) → proxy validates the ID and calls setlist.fm server-side (API key never leaves the server) → setlist data (artist, venue, date, tracks) is shown.
 2. **Matching:** For each setlist entry, we derive a search query (track + artist, normalized). Apple Music search is done via MusicKit in the client (using our Developer Token from the API). User can correct or re-search.
 3. **Export:** User confirms → MusicKit creates a playlist and adds the selected Apple Music track IDs in order.
 
@@ -38,7 +38,7 @@ In this repo, the **web app** (Next.js) serves both the PWA and the API. The API
 
 - **Apple Developer Token (JWT):** Minted server-side only in the `api` package; exposed via the Next.js route `GET /api/apple/dev-token`. Never shipped to the client in source; the client receives it at runtime. Short-lived (e.g. 1 hour); the client refreshes as needed.
 - **Apple User Token:** Obtained in the browser via MusicKit JS after user authorizes. Stays in the client; used for playlist create and catalog search on behalf of the user.
-- **setlist.fm API key:** Kept server-side in the setlist proxy (`GET /api/setlist/proxy`). The client calls our proxy; we add the key and optionally cache / rate-limit.
+- **setlist.fm API key:** Kept server-side in the setlist proxy (`GET /api/setlist/proxy`). The client calls our proxy; we add the key, cache responses in memory (1 h TTL), and rate-limit (20 req/60 s per client IP).
 
 ## Matching Strategy
 
@@ -48,12 +48,12 @@ In this repo, the **web app** (Next.js) serves both the PWA and the API. The API
 
 ## Error Cases and Rate Limits
 
-- **setlist.fm:** Rate limits apply; use optional proxy to cache and throttle. Backoff on 429.
+- **setlist.fm:** Rate limits apply; the proxy caches and throttles. Backoff on 429.
 - **Apple:** Token expiry → refresh Developer Token; user revoke → show re-auth in MusicKit.
 - **Network:** Show clear errors; optional PWA offline support for already-loaded setlist (export still requires network).
 
 ## Caching
 
-- setlist.fm responses can be cached in the proxy (in-memory or Redis) with a short TTL to reduce calls and protect the API key.
+- setlist.fm responses are cached in the proxy (in-memory, 1 h TTL) to reduce calls and protect the API key.
 - Apple catalog search results can be cached client-side per session to avoid duplicate requests during matching.
 - **Next 16+:** Cache Components (`use cache`, PPR) can cache server-rendered setlist or config; see `docs/tech/cache-components.md`.

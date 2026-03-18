@@ -1,4 +1,4 @@
-import type { Setlist, SetlistEntry } from "./types.js";
+import type { Setlist, SetlistEntry } from './types.js';
 
 /**
  * Flatten setlist sets into one ordered list of entries.
@@ -10,10 +10,12 @@ export function flattenSetlistToEntries(setlist: Setlist): SetlistEntry[] {
   for (const set of setlist.sets ?? []) {
     if (!Array.isArray(set)) continue;
     for (const entry of set) {
-      if (entry == null || typeof entry !== "object") continue;
-      const name = "name" in entry && typeof entry.name === "string" ? entry.name : "";
-      const info = "info" in entry && typeof entry.info === "string" ? entry.info : undefined;
-      entries.push({ name, artist: ("artist" in entry && typeof entry.artist === "string" ? entry.artist : undefined) ?? artist, info });
+      if (entry == null || typeof entry !== 'object') continue;
+      const name = 'name' in entry && typeof entry.name === 'string' ? entry.name : '';
+      const info = 'info' in entry && typeof entry.info === 'string' ? entry.info : undefined;
+      const entryArtist =
+        'artist' in entry && typeof entry.artist === 'string' ? entry.artist : undefined;
+      entries.push({ name, artist: entryArtist ?? artist, info });
     }
   }
   return entries;

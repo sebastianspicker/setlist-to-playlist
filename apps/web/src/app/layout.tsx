@@ -1,18 +1,14 @@
-import type { Metadata } from "next";
-import Script from "next/script";
-import "../styles/globals.css";
+import type { Metadata } from 'next';
+import Script from 'next/script';
+import '../styles/globals.css';
 
 export const metadata: Metadata = {
-  title: "Setlist to Playlist",
-  description: "Import a setlist from setlist.fm and create an Apple Music playlist.",
-  manifest: "/manifest.webmanifest",
+  title: 'Setlist to Playlist',
+  description: 'Import a setlist from setlist.fm and create an Apple Music playlist.',
+  manifest: '/manifest.webmanifest',
   referrer: 'no-referrer-when-downgrade',
 };
 
-/**
- * The global Next.js Root Layout wrapper.
- * Injects global CSS, metadata, and the mandatory Apple MusicKit external JS script bundle.
- */
 export default function RootLayout({
   children,
 }: Readonly<{

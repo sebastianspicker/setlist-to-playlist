@@ -1,12 +1,12 @@
-import { APPLE_MUSIC_APP_ID } from "../config";
-import { fetchDeveloperToken } from "./token";
-import type { MusicKitGlobal, MusicKitInstance } from "./types";
+import { APPLE_MUSIC_APP_ID } from '../config';
+import { fetchDeveloperToken } from './token';
+import type { MusicKitGlobal, MusicKitInstance } from './types';
 
 /** Wait for MusicKit script to be available. */
 function waitForMusicKit(): Promise<MusicKitGlobal> {
   return new Promise((resolve, reject) => {
-    if (typeof window === "undefined") {
-      reject(new Error("MusicKit only runs in the browser"));
+    if (typeof window === 'undefined') {
+      reject(new Error('MusicKit only runs in the browser'));
       return;
     }
     if (window.MusicKit) {
@@ -21,7 +21,7 @@ function waitForMusicKit(): Promise<MusicKitGlobal> {
     }, 50);
     setTimeout(() => {
       clearInterval(check);
-      reject(new Error("MusicKit script did not load"));
+      reject(new Error('MusicKit script did not load'));
     }, 10000);
   });
 }
@@ -39,19 +39,19 @@ export async function initMusicKit(): Promise<MusicKitInstance> {
 
   initPromise = (async () => {
     try {
-      if (!APPLE_MUSIC_APP_ID || APPLE_MUSIC_APP_ID.trim() === "") {
+      if (!APPLE_MUSIC_APP_ID || APPLE_MUSIC_APP_ID.trim() === '') {
         throw new Error(
-          "NEXT_PUBLIC_APPLE_MUSIC_APP_ID is required for MusicKit. Set it in your environment (see .env.example)."
+          'NEXT_PUBLIC_APPLE_MUSIC_APP_ID is required for MusicKit. Set it in your environment (see .env.example).'
         );
       }
       const token = await fetchDeveloperToken();
       const MusicKit = await waitForMusicKit();
       const configureResult = MusicKit.configure({
         developerToken: token,
-        app: { name: "Setlist to Playlist", build: "1" },
+        app: { name: 'Setlist to Playlist', build: '1' },
         appId: APPLE_MUSIC_APP_ID,
       });
-      if (configureResult && typeof (configureResult as Promise<unknown>).then === "function") {
+      if (configureResult && typeof (configureResult as Promise<unknown>).then === 'function') {
         await (configureResult as Promise<MusicKitInstance>);
       }
       configuredInstance = MusicKit.getInstance();
@@ -65,11 +65,6 @@ export async function initMusicKit(): Promise<MusicKitInstance> {
   return initPromise;
 }
 
-export function getMusicKitInstance(): MusicKitInstance {
-  if (!configuredInstance) throw new Error("MusicKit not configured. Call initMusicKit() first.");
-  return configuredInstance;
-}
-
 export async function authorizeMusicKit(): Promise<string> {
   const music = await initMusicKit();
   return music.authorize();
@@ -80,7 +75,7 @@ export async function isMusicKitAuthorized(): Promise<boolean> {
     const music = await initMusicKit();
     return music.isAuthorized === true;
   } catch (err) {
-    console.warn("MusicKit authorization check failed during initialization:", err);
+    console.warn('MusicKit authorization check failed during initialization:', err);
     return false;
   }
 }

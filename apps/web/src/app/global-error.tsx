@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { getErrorMessage } from "@repo/shared";
-import { ErrorBoundaryView } from "@/components/ErrorBoundaryView";
+import { getErrorMessage } from '@repo/shared';
+import { ErrorBoundaryView } from '@/components/ErrorBoundaryView';
 
 export default function GlobalError({
   error,
@@ -10,12 +10,12 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  const message = getErrorMessage(error, "An unexpected error occurred. You can try again.");
+  const message = getErrorMessage(error, 'An unexpected error occurred. You can try again.');
 
   return (
     <html lang="en">
-      <body style={{ fontFamily: "system-ui, sans-serif" }}>
-        <ErrorBoundaryView message={message} onReset={() => reset()} />
+      <body style={{ fontFamily: 'system-ui, sans-serif' }}>
+        <ErrorBoundaryView message={message} onReset={reset} />
       </body>
     </html>
   );

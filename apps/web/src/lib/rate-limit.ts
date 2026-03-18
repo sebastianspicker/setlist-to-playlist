@@ -45,14 +45,11 @@ export function createInMemoryRateLimiter(
   };
 }
 
-export function extractClientKeyFromHeaders(
-  headers: Headers,
-  fallback = "unknown"
-): string {
-  const xff = headers.get("x-forwarded-for");
+export function extractClientKeyFromHeaders(headers: Headers, fallback = 'unknown'): string {
+  const xff = headers.get('x-forwarded-for');
   if (xff) {
-    const first = xff.split(",")[0]?.trim();
+    const first = xff.split(',')[0]?.trim();
     if (first) return first;
   }
-  return headers.get("x-real-ip") ?? fallback;
+  return headers.get('x-real-ip') ?? fallback;
 }

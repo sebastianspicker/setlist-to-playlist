@@ -1,8 +1,11 @@
-import { handleSetlistProxy } from "api";
-import { NextRequest } from "next/server";
-import { isErr, MAX_SETLIST_INPUT_LENGTH, SETLIST_MESSAGES } from "@repo/shared";
-import { jsonResponse } from "@/lib/api-response";
-import { internalError, optionsNoContent } from "../../_helpers";
+import { handleSetlistProxy } from 'api';
+import { NextRequest } from 'next/server';
+import { isErr, MAX_SETLIST_INPUT_LENGTH, SETLIST_MESSAGES, API_ERROR } from '@repo/shared';
+import { jsonResponse } from '@/lib/api-response';
+import { internalError, optionsNoContent } from '../../_helpers';
+import { createInMemoryRateLimiter, extractClientKeyFromHeaders } from '@/lib/rate-limit';
+
+const SETLIST_PROXY_RATE_LIMIT = createInMemoryRateLimiter(20, 60_000);
 
 export async function OPTIONS(request: NextRequest) {
   return optionsNoContent(request);
@@ -14,9 +17,21 @@ export async function OPTIONS(request: NextRequest) {
  * DCI-061: Reject id/url longer than MAX_SETLIST_INPUT_LENGTH. DCI-052: try/catch so errors return JSON with CORS.
  */
 export async function GET(request: NextRequest) {
-  const id = request.nextUrl.searchParams.get("id") ?? request.nextUrl.searchParams.get("url") ?? "";
+  const clientKey = extractClientKeyFromHeaders(request.headers);
+  const limit = SETLIST_PROXY_RATE_LIMIT.take(clientKey);
+  if (limit.limited) {
+    return jsonResponse(
+      { error: 'Too many requests. Please retry shortly.', code: API_ERROR.RATE_LIMIT },
+      429,
+      request,
+      { 'Retry-After': String(limit.retryAfterSeconds) }
+    );
+  }
+
+  const id =
+    request.nextUrl.searchParams.get('id') ?? request.nextUrl.searchParams.get('url') ?? '';
   if (!id) {
-    return jsonResponse({ error: "Missing id or url query parameter" }, 400, request);
+    return jsonResponse({ error: 'Missing id or url query parameter.' }, 400, request);
   }
   if (id.length > MAX_SETLIST_INPUT_LENGTH) {
     return jsonResponse({ error: SETLIST_MESSAGES.INPUT_TOO_LONG }, 400, request);

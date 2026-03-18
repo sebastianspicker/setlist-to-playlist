@@ -8,13 +8,13 @@
  *   npx tsx scripts/export-diagnostics.ts --out report.json
  */
 
-import { writeFileSync } from "fs";
-import { dirname, resolve, relative } from "path";
-import { fileURLToPath } from "url";
+import { writeFileSync } from 'node:fs';
+import { dirname, resolve, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const ENV_PREFIXES = ["NEXT_PUBLIC_", "APPLE_", "SETLISTFM_", "ALLOWED_", "API_"];
+const ENV_PREFIXES = ['NEXT_PUBLIC_', 'APPLE_', 'SETLISTFM_', 'ALLOWED_', 'API_'];
 
 function envVarNamesPresent(): string[] {
   const names: string[] = [];
@@ -29,12 +29,11 @@ function resolveOutPath(raw: string): string | null {
   const cwd = process.cwd();
   const normalized = resolve(cwd, raw);
   const rel = relative(cwd, normalized);
-  return rel && !rel.startsWith("..") ? normalized : null;
+  return rel && !rel.startsWith('..') ? normalized : null;
 }
 
 function main() {
-  const apiBase =
-    process.env.NEXT_PUBLIC_API_URL?.trim() || "same-origin (unset)";
+  const apiBase = process.env.NEXT_PUBLIC_API_URL?.trim() || 'same-origin (unset)';
 
   const report = {
     timestamp: new Date().toISOString(),
@@ -45,14 +44,14 @@ function main() {
   };
 
   const json = JSON.stringify(report, null, 2);
-  const outArg = process.argv.indexOf("--out");
+  const outArg = process.argv.indexOf('--out');
   if (outArg !== -1 && process.argv[outArg + 1]) {
     const outPath = resolveOutPath(process.argv[outArg + 1]);
     if (outPath) {
-      writeFileSync(outPath, json, "utf-8");
+      writeFileSync(outPath, json, 'utf-8');
       console.log(`Diagnostics written to ${outPath}`);
     } else {
-      console.error("Refused: --out path must resolve under current directory.");
+      console.error('Refused: --out path must resolve under current directory.');
       process.exitCode = 1;
     }
   } else {

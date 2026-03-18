@@ -1,6 +1,6 @@
-import { parseSetlistIdFromInput } from "@repo/core";
-import { API_ERROR, type Result, SETLIST_MESSAGES, type ApiErrorPayload } from "@repo/shared";
-import { fetchSetlistFromApi } from "../../lib/setlistfm.js";
+import { parseSetlistIdFromInput } from '@repo/core';
+import { API_ERROR, type Result, SETLIST_MESSAGES, type ApiErrorPayload } from '@repo/shared';
+import { fetchSetlistFromApi } from '../../lib/setlistfm.js';
 
 /** Success: body for JSON response. Error: status and message for client. */
 export type SetlistProxyResult = Result<
@@ -12,9 +12,7 @@ export type SetlistProxyResult = Result<
  * Proxy request to setlist.fm: accept setlist ID or URL, return setlist JSON or error.
  * API key is read from env and never sent to the client.
  */
-export async function handleSetlistProxy(
-  setlistIdOrUrl: string
-): Promise<SetlistProxyResult> {
+export async function handleSetlistProxy(setlistIdOrUrl: string): Promise<SetlistProxyResult> {
   const apiKey = process.env.SETLISTFM_API_KEY?.trim();
   if (!apiKey) {
     return {
@@ -22,7 +20,7 @@ export async function handleSetlistProxy(
       error: {
         status: 503,
         error: {
-          error: "Setlist.fm API key not configured",
+          error: 'Setlist.fm API key not configured.',
           code: API_ERROR.SERVICE_UNAVAILABLE,
         },
       },
@@ -50,8 +48,8 @@ export async function handleSetlistProxy(
     fetchResult.status === 404 ? 404 : fetchResult.status >= 500 ? 503 : fetchResult.status;
   const MAX_ERROR_MESSAGE_LENGTH = 500;
   const message =
-    typeof fetchResult.message === "string" && fetchResult.message.length > MAX_ERROR_MESSAGE_LENGTH
-      ? fetchResult.message.slice(0, MAX_ERROR_MESSAGE_LENGTH) + "…"
+    typeof fetchResult.message === 'string' && fetchResult.message.length > MAX_ERROR_MESSAGE_LENGTH
+      ? fetchResult.message.slice(0, MAX_ERROR_MESSAGE_LENGTH) + '…'
       : fetchResult.message;
 
   const code =

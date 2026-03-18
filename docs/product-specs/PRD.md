@@ -83,11 +83,11 @@ Concert-goers and fans want to listen to the exact setlist of a show. setlist.fm
 
 ## Risks and Mitigations
 
-| Risk | Mitigation |
-|------|------------|
-| setlist.fm rate limits / API availability | Use proxy with optional caching; backoff on 429; clear error message to user. |
-| Apple Music catalog gaps (live/rare tracks) | Show "No match"; allow manual search or skip. |
-| User revokes MusicKit authorization | Detect auth errors; show clear re-auth prompt. |
+| Risk                                        | Mitigation                                                                     |
+| ------------------------------------------- | ------------------------------------------------------------------------------ |
+| setlist.fm rate limits / API availability   | Proxy caches responses (1 h TTL); backoff on 429; clear error message to user. |
+| Apple Music catalog gaps (live/rare tracks) | Show "No match"; allow manual search or skip.                                  |
+| User revokes MusicKit authorization         | Detect auth errors; show clear re-auth prompt.                                 |
 
 ---
 

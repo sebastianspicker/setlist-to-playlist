@@ -4,7 +4,7 @@
 
 - Open a branch from `main`, name it e.g. `feat/…`, `fix/…`, `docs/…`.
 - Keep PRs focused; link to issues or exec plans if applicable.
-- Ensure CI passes (lint, test, build).
+- Ensure CI passes (format check, lint, build, test, dependency audit).
 
 ## Lint / Test / Format / Build
 
@@ -12,6 +12,26 @@
 - **Test:** Run `pnpm test`. New logic in `packages/core` or shared code should include tests.
 - **Format:** Use Prettier (project config in repo). Run `pnpm format` or rely on editor format-on-save with `.editorconfig`.
 - **Build:** Run `pnpm build` to build all workspace packages; ensure it succeeds before pushing.
+
+CI enforces all of the above (format check, lint, build, test, dependency audit) on every push and PR.
+
+## Pre-commit hooks (optional)
+
+You can run lint and format checks automatically before each commit using [`simple-git-hooks`](https://github.com/toplenboren/simple-git-hooks) or [`husky`](https://typicode.github.io/husky/). Example with `simple-git-hooks`:
+
+```bash
+pnpm add -D simple-git-hooks
+```
+
+Add to root `package.json`:
+
+```json
+"simple-git-hooks": {
+  "pre-commit": "pnpm format:check && pnpm lint"
+}
+```
+
+Then run `npx simple-git-hooks` once to install. CI will catch any issues that slip through.
 
 ## Optional scripts
 

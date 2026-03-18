@@ -1,6 +1,6 @@
-import type { NextRequest } from "next/server";
-import { NextResponse } from "next/server";
-import { corsHeaders } from "./cors";
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
+import { corsHeaders } from './cors';
 
 /**
  * JSON response with CORS headers for API routes (App Router pattern).
@@ -14,8 +14,8 @@ export function jsonResponse(
 ): NextResponse {
   const headers = new Headers(corsHeaders(request));
   // DCI-009: Standard security hardening for API responses.
-  headers.set("X-Content-Type-Options", "nosniff");
-  headers.set("X-Frame-Options", "DENY");
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('X-Frame-Options', 'DENY');
 
   if (extraHeaders) {
     for (const [k, v] of Object.entries(extraHeaders)) {

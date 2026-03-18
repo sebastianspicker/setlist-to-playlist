@@ -1,5 +1,5 @@
-import { initMusicKit } from "./client";
-import type { AppleMusicTrack } from "./types";
+import { initMusicKit } from './client';
+import type { AppleMusicTrack } from './types';
 
 const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
 const SEARCH_CACHE_MAX_SIZE = 500;
@@ -25,7 +25,7 @@ function evictSearchCache(): void {
  */
 export async function searchCatalog(term: string, limit = 5): Promise<AppleMusicTrack[]> {
   const music = await initMusicKit();
-  const storefront = music.storefrontId || "us";
+  const storefront = music.storefrontId || 'us';
   const cacheKey = `${storefront}:${term}:${limit}`;
   const entry = searchCache.get(cacheKey);
   if (entry && Date.now() < entry.expires) return entry.tracks;
@@ -35,22 +35,24 @@ export async function searchCatalog(term: string, limit = 5): Promise<AppleMusic
   const params = new URLSearchParams({
     term,
     limit: String(limit),
-    types: "songs",
+    types: 'songs',
   });
   const path = `/v1/catalog/${storefront}/search?${params.toString()}`;
 
   const data = (await music.music.api(path)) as {
-    results?: { songs?: { data?: Array<{ id: string; attributes?: { name?: string; artistName?: string } }> } };
+    results?: {
+      songs?: { data?: Array<{ id: string; attributes?: { name?: string; artistName?: string } }> };
+    };
     errors?: Array<{ detail?: string; status?: string }>;
   };
   if (data?.errors && Array.isArray(data.errors) && data.errors.length > 0) {
-    const detail = data.errors.map((e) => e.detail ?? e.status ?? "Unknown").join("; ");
+    const detail = data.errors.map((e) => e.detail ?? e.status ?? 'Unknown').join('; ');
     throw new Error(`Catalog search failed: ${detail}`);
   }
   const songs = data?.results?.songs?.data ?? [];
   const tracks: AppleMusicTrack[] = songs.map((s) => ({
     id: s.id,
-    name: s.attributes?.name ?? "",
+    name: s.attributes?.name ?? '',
     artistName: s.attributes?.artistName,
   }));
   searchCache.set(cacheKey, { tracks, expires: Date.now() + SEARCH_CACHE_TTL_MS });

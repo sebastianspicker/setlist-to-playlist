@@ -1,1 +1,1 @@
-export { CreatePlaylistView } from "./CreatePlaylistView";
+export { CreatePlaylistView } from './CreatePlaylistView';

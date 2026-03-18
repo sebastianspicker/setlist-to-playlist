@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
 :root {
   --bg-color: #0f172a;
   --text-main: #f8fafc;
@@ -20,12 +18,15 @@
 
 body {
   margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
   font-size: 16px;
   line-height: 1.6;
   color: var(--text-main);
   background: var(--bg-color);
-  background-image: 
+  background-image:
     radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.15), transparent 25%),
     radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.15), transparent 25%);
   background-attachment: fixed;
@@ -40,7 +41,9 @@ body {
   border: 1px solid var(--glass-border);
   border-radius: 12px;
   padding: 1.5rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 .premium-input {
@@ -361,7 +364,7 @@ body {
   top: 0.5rem;
 }
 
-/* Accessibility: visible focus for keyboard navigation (UI/UX Pro Max) */
+/* Visible focus ring for keyboard navigation */
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
@@ -373,13 +376,16 @@ input:focus-visible,
 /* Touch targets: minimum 44px (WCAG 2.5.5) */
 button {
   min-height: 44px;
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
 }
 a[href] {
   transition: color 0.2s ease;
 }
 
-/* Respect reduced motion (UI/UX Pro Max checklist) */
+/* Respect reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -396,7 +402,7 @@ a[href] {
     padding-left: 1rem !important;
     padding-right: 1rem !important;
   }
-  input[type="text"] {
+  input[type='text'] {
     max-width: 100% !important;
   }
   .matching-row-main {

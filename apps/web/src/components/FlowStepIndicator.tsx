@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 interface FlowStepIndicatorProps {
   step: number;
@@ -10,7 +10,7 @@ export function FlowStepIndicator({ step, total, label }: FlowStepIndicatorProps
   return (
     <p role="status" aria-live="polite" className="step-indicator">
       Step {step} of {total}
-      {label ? ` · ${label}` : ""}
+      {label ? ` · ${label}` : ''}
     </p>
   );
 }

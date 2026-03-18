@@ -8,21 +8,21 @@
  * Writes to scripts/fixtures/demo-setlists.json (create fixtures dir if needed).
  */
 
-import { writeFileSync, mkdirSync, existsSync } from "fs";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
+import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const SETLIST_FM_BASE_URL = "https://api.setlist.fm/rest/1.0";
+const SETLIST_FM_BASE_URL = 'https://api.setlist.fm/rest/1.0';
 
 /** Known setlist IDs used in docs and tests (e.g. 63de4613). */
-const DEMO_SETLIST_IDS = ["63de4613"];
+const DEMO_SETLIST_IDS = ['63de4613'];
 
 async function fetchSetlist(setlistId: string, apiKey: string): Promise<unknown> {
   const url = `${SETLIST_FM_BASE_URL}/setlist/${encodeURIComponent(setlistId)}`;
   const res = await fetch(url, {
-    headers: { "x-api-key": apiKey, Accept: "application/json" },
+    headers: { 'x-api-key': apiKey, Accept: 'application/json' },
   });
   if (!res.ok) {
     const text = await res.text();
@@ -34,11 +34,11 @@ async function fetchSetlist(setlistId: string, apiKey: string): Promise<unknown>
 async function main() {
   const apiKey = process.env.SETLISTFM_API_KEY?.trim();
   if (!apiKey) {
-    console.error("Set SETLISTFM_API_KEY to run this script.");
+    console.error('Set SETLISTFM_API_KEY to run this script.');
     process.exit(1);
   }
 
-  const fixturesDir = join(__dirname, "fixtures");
+  const fixturesDir = join(__dirname, 'fixtures');
   if (!existsSync(fixturesDir)) {
     mkdirSync(fixturesDir, { recursive: true });
   }
@@ -54,8 +54,8 @@ async function main() {
     }
   }
 
-  const outPath = join(fixturesDir, "demo-setlists.json");
-  writeFileSync(outPath, JSON.stringify(out, null, 2), "utf-8");
+  const outPath = join(fixturesDir, 'demo-setlists.json');
+  writeFileSync(outPath, JSON.stringify(out, null, 2), 'utf-8');
   console.log(`Wrote ${Object.keys(out).length} setlist(s) to ${outPath}`);
 }
 

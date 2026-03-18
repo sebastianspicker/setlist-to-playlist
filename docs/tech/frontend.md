@@ -14,4 +14,12 @@ For Cache Components (Next 16+) and PPR, see [cache-components.md](cache-compone
 
 ## Config and API
 
-The web app reads `NEXT_PUBLIC_API_URL` (and `NEXT_PUBLIC_APPLE_MUSIC_APP_ID`) from the environment; see `apps/web/src/lib/config.ts`. API_BASE_URL is used consistently for the Developer Token and setlist proxy requests. All client-side API calls should use `apiUrl()`, `devTokenUrl()`, `setlistProxyUrl()`, or `healthUrl()` from `apps/web/src/lib/api.ts` so that changing `NEXT_PUBLIC_API_URL` changes the requests. In dev, set `NEXT_PUBLIC_API_URL` to the API origin (e.g. `http://localhost:3000` if the API is served from the same Next.js app, or the standalone API URL if separate). PWA: `manifest.webmanifest` (linked in layout), icons in `public/icons/`. No service worker is implemented yet; optional for offline shell. Features live under `apps/web/src/features` (setlist-import, matching, playlist-export). MusicKit client logic is split into dedicated modules (`lib/musickit/*`) for token, init, catalog search and playlist write operations.
+Config lives in `apps/web/src/lib/config.ts`. It reads `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_APPLE_MUSIC_APP_ID` from the environment. All client-side API calls go through the helpers in `apps/web/src/lib/api.ts` (`apiUrl()`, `devTokenUrl()`, `setlistProxyUrl()`, `healthUrl()`), so changing `NEXT_PUBLIC_API_URL` is the single knob to redirect all requests. In dev, if the API and web app share the same Next.js process, leave `NEXT_PUBLIC_API_URL` unset (same-origin) or set it to `http://localhost:3000`.
+
+## Features and MusicKit
+
+Features live under `apps/web/src/features/`: `setlist-import`, `matching`, and `playlist-export`. MusicKit client logic is split into `lib/musickit/` modules — one each for token caching, SDK init, catalog search, and playlist writes.
+
+## PWA
+
+`manifest.webmanifest` is linked in the root layout; icons are in `public/icons/`. No service worker is implemented; offline support for the export step isn't feasible anyway (requires network and Apple Music auth).

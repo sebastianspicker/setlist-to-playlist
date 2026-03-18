@@ -18,15 +18,15 @@ Source: UI/UX Pro Max (design-system search). Use for UI work and consistency.
 
 ## Colors (reference; current app uses light theme)
 
-| Role       | Hex       | Notes              |
-|-----------|-----------|--------------------|
-| Primary   | #1E1B4B   | Dark accent        |
-| Secondary | #4338CA   | Focus ring in app  |
-| CTA       | #22C55E   | Success / go       |
-| Background| #fff      | Current            |
-| Text      | #1a1a1a   | Current body       |
-| Muted     | #666      | Secondary text     |
-| Error     | #b91c1c   | ErrorAlert         |
+| Role       | Hex     | Notes             |
+| ---------- | ------- | ----------------- |
+| Primary    | #1E1B4B | Dark accent       |
+| Secondary  | #4338CA | Focus ring in app |
+| CTA        | #22C55E | Success / go      |
+| Background | #fff    | Current           |
+| Text       | #1a1a1a | Current body      |
+| Muted      | #666    | Secondary text    |
+| Error      | #b91c1c | ErrorAlert        |
 
 ## Typography
 

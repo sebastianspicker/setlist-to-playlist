@@ -15,11 +15,11 @@
   "scripts": {
     "build": "tsc",
     "lint": "eslint src --ext .ts",
-    "test": "vitest run"
+    "test": "vitest run --coverage"
   },
   "devDependencies": {
-    "@repo/shared": "workspace:*",
     "@types/node": "^22.10.1",
+    "@vitest/coverage-v8": "^2.1.6",
     "typescript": "^5.7.2",
     "vitest": "^2.1.6"
   }

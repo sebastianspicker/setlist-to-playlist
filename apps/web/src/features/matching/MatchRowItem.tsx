@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import type { AppleMusicTrack } from "@/lib/musickit";
-import type { MatchRow } from "./types";
-import { TrackSearchPanel } from "./TrackSearchPanel";
+import type { AppleMusicTrack } from '@/lib/musickit';
+import type { MatchRow } from './types';
+import { TrackSearchPanel } from './TrackSearchPanel';
 
 export interface MatchRowItemProps {
   row: MatchRow;
@@ -37,7 +37,7 @@ export function MatchRowItem({
     <li className="matching-row">
       <div className="matching-row-main">
         <div className="matching-track-meta">
-          <strong>{row.setlistEntry?.name ?? "—"}</strong>
+          <strong>{row.setlistEntry?.name ?? '—'}</strong>
           {row.setlistEntry?.artist && (
             <span className="muted-inline"> — {row.setlistEntry.artist}</span>
           )}
@@ -50,7 +50,7 @@ export function MatchRowItem({
                 <span className="muted-inline"> · {row.appleTrack.artistName}</span>
               )}
             </span>
-          ) : row.status === "skipped" ? (
+          ) : row.status === 'skipped' ? (
             <span className="muted-inline">Skipped</span>
           ) : (
             <span className="muted-inline">No match</span>
@@ -60,7 +60,7 @@ export function MatchRowItem({
           <button
             type="button"
             onClick={() => onOpenSearch(index)}
-            aria-label={`Change match for ${row.setlistEntry?.name ?? "track"}`}
+            aria-label={`Change match for ${row.setlistEntry?.name ?? 'track'}`}
             className="premium-button secondary mini"
           >
             Change

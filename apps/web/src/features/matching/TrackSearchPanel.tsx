@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { StatusText } from "@/components/StatusText";
-import type { AppleMusicTrack } from "@/lib/musickit";
+import { StatusText } from '@/components/StatusText';
+import type { AppleMusicTrack } from '@/lib/musickit';
 
 export interface TrackSearchPanelProps {
   index: number;
@@ -32,7 +32,7 @@ export function TrackSearchPanel({
         value={searchQuery}
         onChange={(e) => onSearchQueryChange(e.target.value)}
         placeholder="Search Apple Music…"
-        onKeyDown={(e) => e.key === "Enter" && onSearch()}
+        onKeyDown={(e) => e.key === 'Enter' && onSearch()}
         aria-label="Search Apple Music for this track"
         className="premium-input search-input"
       />
@@ -44,7 +44,7 @@ export function TrackSearchPanel({
         aria-busy={searching}
         className="premium-button secondary"
       >
-        {searching ? "Searching…" : "Search"}
+        {searching ? 'Searching…' : 'Search'}
       </button>
       {searching && <StatusText className="inline-status">Searching…</StatusText>}
       {searchError && !searching && (
@@ -62,7 +62,7 @@ export function TrackSearchPanel({
                 className="search-result-button"
               >
                 {track.name}
-                {track.artistName ? ` · ${track.artistName}` : ""}
+                {track.artistName ? ` · ${track.artistName}` : ''}
               </button>
             </li>
           ))}

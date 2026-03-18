@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import type { CSSProperties } from "react";
+import type { CSSProperties } from 'react';
 
 export interface StatusTextProps {
   children: React.ReactNode;
@@ -20,8 +20,8 @@ export function StatusText({ children, style, className }: StatusTextProps) {
       aria-live="polite"
       className={className}
       style={{
-        color: "var(--text-muted)",
-        fontSize: "0.9em",
+        color: 'var(--text-muted)',
+        fontSize: '0.9em',
         margin: 0,
         ...style,
       }}

@@ -1,35 +1,30 @@
-"use client";
+'use client';
 
-import { useEffect, useRef, useState } from "react";
-import { mapSetlistFmToSetlist } from "@repo/core";
-import type { Setlist, SetlistFmResponse } from "@repo/core";
-import {
-  getErrorMessage,
-  isOk,
-  MAX_SETLIST_INPUT_LENGTH,
-  SETLIST_MESSAGES,
-} from "@repo/shared";
-import { setlistProxyUrl } from "@/lib/api";
-import { fetchJson } from "@/lib/fetch";
+import { useEffect, useRef, useState } from 'react';
+import { mapSetlistFmToSetlist } from '@repo/core';
+import type { Setlist, SetlistFmResponse } from '@repo/core';
+import { getErrorMessage, isOk, MAX_SETLIST_INPUT_LENGTH, SETLIST_MESSAGES } from '@repo/shared';
+import { setlistProxyUrl } from '@/lib/api';
+import { fetchJson } from '@/lib/fetch';
 
-const HISTORY_KEY = "setlist_import_history_v1";
+const HISTORY_KEY = 'setlist_import_history_v1';
 const MAX_HISTORY_ITEMS = 8;
 
 function readHistory(): string[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === 'undefined') return [];
   try {
     const raw = window.localStorage.getItem(HISTORY_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((x): x is string => typeof x === "string").slice(0, MAX_HISTORY_ITEMS);
+    return parsed.filter((x): x is string => typeof x === 'string').slice(0, MAX_HISTORY_ITEMS);
   } catch {
     return [];
   }
 }
 
 function writeHistory(next: string[]): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === 'undefined') return;
   try {
     window.localStorage.setItem(HISTORY_KEY, JSON.stringify(next.slice(0, MAX_HISTORY_ITEMS)));
   } catch {
@@ -58,7 +53,7 @@ export interface UseSetlistImportState {
 }
 
 export function useSetlistImportState(): UseSetlistImportState {
-  const [inputValue, setInputValueState] = useState("");
+  const [inputValue, setInputValueState] = useState('');
   const [setlist, setSetlist] = useState<Setlist | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,9 +100,9 @@ export function useSetlistImportState(): UseSetlistImportState {
         return false;
       }
     } catch (err) {
-      if ((err as { name?: string })?.name === "AbortError") return false;
+      if ((err as { name?: string })?.name === 'AbortError') return false;
       if (currentRequestRef.current !== trimmed) return false;
-      setError(getErrorMessage(err, "Network error"));
+      setError(getErrorMessage(err, 'Network error.'));
       setSetlist(null);
       return false;
     } finally {
@@ -116,7 +111,6 @@ export function useSetlistImportState(): UseSetlistImportState {
         currentRequestRef.current = null;
       }
     }
-    return false;
   }
 
   function retryLast() {

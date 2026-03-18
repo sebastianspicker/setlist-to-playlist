@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { getErrorMessage } from "@repo/shared";
-import { Button } from "@repo/ui";
-import { ErrorAlert } from "@/components/ErrorAlert";
-import { LoadingButton } from "@/components/LoadingButton";
-import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { authorizeMusicKit, initMusicKit } from "@/lib/musickit";
+import { getErrorMessage } from '@repo/shared';
+import { Button } from '@repo/ui';
+import { ErrorAlert } from '@/components/ErrorAlert';
+import { LoadingButton } from '@/components/LoadingButton';
+import { useAsyncAction } from '@/hooks/useAsyncAction';
+import { authorizeMusicKit, initMusicKit } from '@/lib/musickit';
 
 export interface ConnectAppleMusicProps {
   onAuthorized?: () => void;
@@ -13,11 +13,11 @@ export interface ConnectAppleMusicProps {
 }
 
 function friendlyAuthMessage(message: string): string {
-  if (message.includes("cancel") || message.includes("denied")) {
-    return "You cancelled or denied access. Click below to try again.";
+  if (message.includes('cancel') || message.includes('denied')) {
+    return 'You cancelled or denied access. Click below to try again.';
   }
-  if (message.includes("revoked") || message.includes("unauthorized")) {
-    return "Apple Music access was revoked. Click below to connect again.";
+  if (message.includes('revoked') || message.includes('unauthorized')) {
+    return 'Apple Music access was revoked. Click below to connect again.';
   }
   return message;
 }
@@ -27,7 +27,7 @@ function friendlyAuthMessage(message: string): string {
  */
 export function ConnectAppleMusic({
   onAuthorized,
-  label = "Connect Apple Music",
+  label = 'Connect Apple Music',
 }: ConnectAppleMusicProps) {
   const { loading, error, run } = useAsyncAction();
 
@@ -37,7 +37,7 @@ export function ConnectAppleMusic({
         await authorizeMusicKit();
         onAuthorized?.();
       } catch (err) {
-        const message = getErrorMessage(err, "Authorization failed");
+        const message = getErrorMessage(err, 'Authorization failed.');
         throw new Error(friendlyAuthMessage(message));
       }
     });
@@ -50,18 +50,18 @@ export function ConnectAppleMusic({
         await music.unauthorize();
         onAuthorized?.();
       } catch (err) {
-        throw new Error(getErrorMessage(err, "Failed to disconnect"));
+        throw new Error(getErrorMessage(err, 'Failed to disconnect.'));
       }
     });
   }
 
   return (
-    <div style={{ marginTop: "1rem" }}>
+    <div style={{ marginTop: '1rem' }}>
       <LoadingButton
         onClick={handleAuthorize}
         loading={loading}
         loadingChildren="Connecting…"
-        aria-label={loading ? "Connecting to Apple Music" : label}
+        aria-label={loading ? 'Connecting to Apple Music' : label}
         title="Sign in with Apple Music to create playlists in your library"
       >
         {label}
@@ -72,17 +72,13 @@ export function ConnectAppleMusic({
         disabled={loading}
         variant="secondary"
         aria-label="Disconnect Apple Music"
-        style={{ marginLeft: "0.5rem", cursor: loading ? "not-allowed" : "pointer" }}
+        style={{ marginLeft: '0.5rem', cursor: loading ? 'not-allowed' : 'pointer' }}
       >
         Disconnect
       </Button>
 
       {error && (
-        <ErrorAlert
-          message={error}
-          onRetry={handleAuthorize}
-          retryLabel="Try connecting again"
-        />
+        <ErrorAlert message={error} onRetry={handleAuthorize} retryLabel="Try connecting again" />
       )}
     </div>
   );

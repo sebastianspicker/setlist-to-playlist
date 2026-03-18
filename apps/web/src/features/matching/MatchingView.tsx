@@ -1,20 +1,20 @@
-"use client";
+'use client';
 
-import { useRef, useState } from "react";
-import { buildSearchQuery } from "@repo/core";
-import type { Setlist } from "@repo/core";
-import { FlowStepIndicator } from "@/components/FlowStepIndicator";
-import { LoadingButton } from "@/components/LoadingButton";
-import { SectionTitle } from "@/components/SectionTitle";
-import { StatusText } from "@/components/StatusText";
-import type { AppleMusicTrack } from "@/lib/musickit";
-import { searchCatalog } from "@/lib/musickit";
-import { MatchRowItem } from "./MatchRowItem";
-import { MatchingBulkActions } from "./MatchingBulkActions";
-import type { MatchRow } from "./types";
-import { useMatchingSuggestions } from "./useMatchingSuggestions";
+import { useRef, useState } from 'react';
+import { buildSearchQuery } from '@repo/core';
+import type { Setlist } from '@repo/core';
+import { FlowStepIndicator } from '@/components/FlowStepIndicator';
+import { LoadingButton } from '@/components/LoadingButton';
+import { SectionTitle } from '@/components/SectionTitle';
+import { StatusText } from '@/components/StatusText';
+import type { AppleMusicTrack } from '@/lib/musickit';
+import { searchCatalog } from '@/lib/musickit';
+import { MatchRowItem } from './MatchRowItem';
+import { MatchingBulkActions } from './MatchingBulkActions';
+import type { MatchRow } from './types';
+import { useMatchingSuggestions } from './useMatchingSuggestions';
 
-export type { MatchRow } from "./types";
+export type { MatchRow } from './types';
 
 export interface MatchingViewProps {
   setlist: Setlist;
@@ -33,7 +33,7 @@ export function MatchingView({ setlist, onProceedToCreatePlaylist }: MatchingVie
   } = useMatchingSuggestions(setlist);
 
   const [searchingIndex, setSearchingIndex] = useState<number | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<AppleMusicTrack[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState(false);
@@ -42,7 +42,8 @@ export function MatchingView({ setlist, onProceedToCreatePlaylist }: MatchingVie
   async function runSearch(index: number) {
     const row = matches[index];
     if (index < 0 || index >= matches.length || !row?.setlistEntry) return;
-    const q = searchQuery.trim() || buildSearchQuery(row.setlistEntry.name, row.setlistEntry.artist);
+    const q =
+      searchQuery.trim() || buildSearchQuery(row.setlistEntry.name, row.setlistEntry.artist);
     if (!q) return;
     const runId = Date.now();
     searchRunIdRef.current = runId;
@@ -65,7 +66,7 @@ export function MatchingView({ setlist, onProceedToCreatePlaylist }: MatchingVie
 
   function openSearch(index: number) {
     setSearchingIndex(index);
-    setSearchQuery("");
+    setSearchQuery('');
     setSearchResults([]);
     setSearchError(false);
   }
@@ -73,7 +74,7 @@ export function MatchingView({ setlist, onProceedToCreatePlaylist }: MatchingVie
   function chooseTrack(index: number, track: AppleMusicTrack) {
     setMatch(index, track);
     setSearchingIndex(null);
-    setSearchQuery("");
+    setSearchQuery('');
     setSearchResults([]);
   }
 
@@ -81,7 +82,7 @@ export function MatchingView({ setlist, onProceedToCreatePlaylist }: MatchingVie
     setMatch(index, null);
     if (searchingIndex === index) {
       setSearchingIndex(null);
-      setSearchQuery("");
+      setSearchQuery('');
       setSearchResults([]);
     }
   }
@@ -104,7 +105,7 @@ export function MatchingView({ setlist, onProceedToCreatePlaylist }: MatchingVie
       />
 
       {loadingSuggestions && (
-        <StatusText style={{ marginBottom: "1rem" }}>Fetching suggestions…</StatusText>
+        <StatusText style={{ marginBottom: '1rem' }}>Fetching suggestions…</StatusText>
       )}
 
       {suggestionError && !loadingSuggestions && (
@@ -133,7 +134,7 @@ export function MatchingView({ setlist, onProceedToCreatePlaylist }: MatchingVie
         ))}
       </ul>
 
-      <div style={{ marginTop: "1.5rem" }}>
+      <div style={{ marginTop: '1.5rem' }}>
         <LoadingButton
           onClick={() => onProceedToCreatePlaylist(matches)}
           disabled={!canProceed}
@@ -142,7 +143,7 @@ export function MatchingView({ setlist, onProceedToCreatePlaylist }: MatchingVie
           Create playlist →
         </LoadingButton>
         {!canProceed && (
-          <p className="muted-block" style={{ marginTop: "0.5rem" }}>
+          <p className="muted-block" style={{ marginTop: '0.5rem' }}>
             Match at least one track to create a playlist.
           </p>
         )}

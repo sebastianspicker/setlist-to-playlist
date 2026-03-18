@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { LoadingButton } from "@/components/LoadingButton";
+import { LoadingButton } from '@/components/LoadingButton';
 
 export interface MatchingBulkActionsProps {
   loading: boolean;

@@ -1,14 +1,13 @@
-"use client";
+'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { buildSearchQuery, flattenSetlistToEntries, getSetlistSignature } from "@repo/core";
-import type { Setlist } from "@repo/core";
-import type { AppleMusicTrack } from "@/lib/musickit";
-import { searchCatalog } from "@/lib/musickit";
-import type { MatchRow } from "./types";
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { buildSearchQuery, flattenSetlistToEntries, getSetlistSignature } from '@repo/core';
+import type { Setlist } from '@repo/core';
+import type { AppleMusicTrack } from '@/lib/musickit';
+import { searchCatalog } from '@/lib/musickit';
+import type { MatchRow } from './types';
 
 export interface UseMatchingSuggestionsResult {
-  entries: MatchRow["setlistEntry"][];
   matches: MatchRow[];
   loadingSuggestions: boolean;
   suggestionError: boolean;
@@ -22,7 +21,7 @@ function toInitialMatches(setlist: Setlist): MatchRow[] {
   return flattenSetlistToEntries(setlist).map((setlistEntry) => ({
     setlistEntry,
     appleTrack: null,
-    status: "unmatched",
+    status: 'unmatched',
   }));
 }
 
@@ -50,7 +49,7 @@ export function useMatchingSuggestions(setlist: Setlist): UseMatchingSuggestions
       entriesFlat.map((setlistEntry) => ({
         setlistEntry,
         appleTrack: null,
-        status: "unmatched",
+        status: 'unmatched',
       }))
     );
     for (let i = 0; i < entriesFlat.length; i++) {
@@ -68,7 +67,7 @@ export function useMatchingSuggestions(setlist: Setlist): UseMatchingSuggestions
             next[i] = {
               ...next[i],
               appleTrack: track,
-              status: track ? "matched" : "unmatched",
+              status: track ? 'matched' : 'unmatched',
             };
           }
           return next;
@@ -92,7 +91,7 @@ export function useMatchingSuggestions(setlist: Setlist): UseMatchingSuggestions
       next[index] = {
         ...next[index],
         appleTrack,
-        status: appleTrack ? "matched" : "skipped",
+        status: appleTrack ? 'matched' : 'skipped',
       };
       return next;
     });
@@ -107,14 +106,11 @@ export function useMatchingSuggestions(setlist: Setlist): UseMatchingSuggestions
 
   const skipUnmatched = useCallback(() => {
     setMatches((prev) =>
-      prev.map((row) =>
-        row.appleTrack ? row : { ...row, appleTrack: null, status: "skipped" }
-      )
+      prev.map((row) => (row.appleTrack ? row : { ...row, appleTrack: null, status: 'skipped' }))
     );
   }, []);
 
   return {
-    entries: flattenSetlistToEntries(setlist),
     matches,
     loadingSuggestions,
     suggestionError,

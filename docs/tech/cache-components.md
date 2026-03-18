@@ -1,31 +1,20 @@
-# Cache Components (Next.js 16+)
+# Cache Components (Next.js 16)
 
-This app currently runs on **Next.js 15**. Cache Components (PPR, `use cache`, `cacheLife`, `cacheTag`) are available in **Next.js 16+**. This doc describes the migration path and where caching would apply.
+Cache Components (`use cache`, `cacheLife`, `cacheTag`, PPR) are available in Next.js 16, which this app uses. To enable them, set `cacheComponents: true` in `next.config.ts`.
 
-## When upgrading to Next 16
+## Current state
 
-1. **Enable in config**
+Nothing uses `use cache` yet. The home page is a static shell (title, steps list) plus a client component (`SetlistImportView`) that fetches via Route Handlers after user input. There's no server-side data fetching in the RSC tree to cache.
 
-   ```ts
-   // next.config.ts
-   const nextConfig: NextConfig = {
-     cacheComponents: true,  // Replaces experimental.ppr
-     // ...
-   }
-   ```
+## Where caching would help
 
-2. **Current page shape** (no change required for 15 → 16)
-   - The home page is a **static shell** (title, steps list) plus a **client component** (`SetlistImportView`) that fetches via Route Handlers. No server-side data fetching in the RSC tree yet, so there is nothing to put behind `use cache` today.
-   - `loading.tsx` and `error.tsx` / `global-error.tsx` already follow the static/dynamic boundary pattern.
+- **Server-fetched setlist**: If you add a Server Component that fetches a setlist by ID (e.g. for SEO or share links), wrap the fetch in a `'use cache'` function with `cacheTag('setlist', id)` and `cacheLife('minutes')`. Repeated views of the same setlist hit the cache.
+- **Health or config**: Any server-only read that rarely changes (feature flags, remote config) suits `'use cache'` with a long `cacheLife` and a tag for manual invalidation.
 
-3. **Where Cache Components would help later**
-   - **Static content**: The intro copy and steps list are already synchronous; they stay static.
-   - **Server-fetched setlist**: If you ever fetch a setlist by ID in a Server Component (e.g. for SEO or share links), wrap that fetch in a function with `'use cache'`, `cacheTag('setlist', id)`, and `cacheLife('minutes')` so repeated views of the same setlist are cached.
-   - **Health or config**: Any server-only read that rarely changes (e.g. feature flags) could use `'use cache'` with a suitable `cacheLife` and `cacheTag` for invalidation.
+## Constraints
 
-4. **Constraints**
-   - Do not use `cookies()`, `headers()`, or `searchParams` inside `'use cache'`; pass needed values as arguments (they become part of the cache key).
-   - Edge runtime and static export are not supported with Cache Components (Node.js server required).
+- Don't call `cookies()`, `headers()`, or `searchParams` inside a `'use cache'` function. Pass needed values as arguments — they become part of the cache key.
+- Cache Components require the Node.js runtime. Edge runtime and static export are not supported.
 
 ## References
 

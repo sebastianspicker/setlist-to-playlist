@@ -4,11 +4,11 @@
 
 The API is served by the **Next.js app** (`apps/web`) via API Routes. One deployment serves both frontend and API; no separate API server.
 
-| Route | Purpose |
-|-------|---------|
-| `GET /api/health` | Liveness check. Returns `{ status: "ok", timestamp: "..." }`. Use for load balancers and deployment health checks. |
-| `GET /api/apple/dev-token` | Apple Developer Token (JWT) for MusicKit. Returns `{ token: "..." }` or structured errors (including `code`). Includes lightweight in-memory rate limiting (`429`, `Retry-After`). |
-| `GET /api/setlist/proxy?id=...` or `?url=...` | setlist.fm proxy. Returns setlist JSON or structured errors `{ error, code? }`. API key stays server-side. |
+| Route                                         | Purpose                                                                                                                                                                            |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/health`                             | Liveness check. Returns `{ status: "ok", timestamp: "..." }`. Use for load balancers and deployment health checks.                                                                 |
+| `GET /api/apple/dev-token`                    | Apple Developer Token (JWT) for MusicKit. Returns `{ token: "..." }` or structured errors (including `code`). Includes lightweight in-memory rate limiting (`429`, `Retry-After`). |
+| `GET /api/setlist/proxy?id=...` or `?url=...` | setlist.fm proxy. Returns setlist JSON or structured errors `{ error, code? }`. API key stays server-side.                                                                         |
 
 Business logic lives in the `api` package (`apps/api`); the Next.js routes import from `api` and return HTTP responses (with CORS where needed).
 

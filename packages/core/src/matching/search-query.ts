@@ -1,4 +1,4 @@
-import { normalizeTrackName } from "./normalize.js";
+import { normalizeTrackName } from './normalize.js';
 
 /** DCI-051: Cap length to avoid very long queries hitting API limits. */
 const MAX_QUERY_LENGTH = 200;
@@ -9,7 +9,7 @@ const MAX_QUERY_LENGTH = 200;
  */
 export function buildSearchQuery(trackName: string, artistName?: string): string {
   const track = normalizeTrackName(trackName).slice(0, MAX_QUERY_LENGTH);
-  const artist = (artistName?.trim() ?? "").slice(0, MAX_QUERY_LENGTH);
+  const artist = (artistName?.trim() ?? '').slice(0, MAX_QUERY_LENGTH);
   const parts = [track, artist].filter(Boolean);
-  return parts.join(" ").replace(/\s+/g, " ").trim();
+  return parts.join(' ').replace(/\s+/g, ' ').trim();
 }

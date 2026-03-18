@@ -3,7 +3,7 @@
 ## Base URL and API key
 
 - **Base URL:** `https://api.setlist.fm/rest/1.0`
-- **Authentication:** Pass your API key in the request header: `x-api-key: <your-api-key>` (or `Authorization: Bearer <key>` if setlist.fm documents it; current convention is `x-api-key`).
+- **Authentication:** Pass your API key as `x-api-key: <your-api-key>` in the request header.
 
 ## Obtaining an API key
 

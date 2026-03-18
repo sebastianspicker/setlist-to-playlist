@@ -7,23 +7,23 @@ export function parseSetlistIdFromInput(idOrUrl: string): string | null {
   if (!trimmed) return null;
 
   if (
-    trimmed.startsWith("http://") ||
-    trimmed.startsWith("https://") ||
-    trimmed.includes("setlist.fm")
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.includes('setlist.fm')
   ) {
     try {
-      const url = new URL(trimmed.startsWith("http") ? trimmed : `https://${trimmed}`);
+      const url = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`);
       const hostname = url.hostname.toLowerCase();
-      if (hostname !== "setlist.fm" && hostname !== "www.setlist.fm") return null;
+      if (hostname !== 'setlist.fm' && hostname !== 'www.setlist.fm') return null;
 
       const path = url.pathname;
 
       const match = path.match(/-([a-f0-9]{4,12})\.html$/i);
       if (match) return match[1];
 
-      const segment = path.split("/").filter(Boolean).pop() ?? "";
-      const withoutHtml = segment.replace(/\.html$/i, "");
-      const idPart = withoutHtml.split("-").pop();
+      const segment = path.split('/').filter(Boolean).pop() ?? '';
+      const withoutHtml = segment.replace(/\.html$/i, '');
+      const idPart = withoutHtml.split('-').pop();
       if (idPart && /^[a-f0-9]{4,12}$/i.test(idPart)) return idPart;
       if (withoutHtml && /^[a-f0-9-]+$/i.test(withoutHtml)) return withoutHtml;
     } catch {

@@ -1,16 +1,16 @@
 const demoTracks = [
   "Can't Buy Me Love",
   "A Hard Day's Night",
-  "Things We Said Today",
+  'Things We Said Today',
   "You Can't Do That",
-  "If I Fell",
-  "Long Tall Sally",
+  'If I Fell',
+  'Long Tall Sally',
 ];
 
 const matchRows = [
-  { setlist: "Can't Buy Me Love", apple: "Can't Buy Me Love · The Beatles", status: "Matched" },
-  { setlist: "A Hard Day's Night", apple: "A Hard Day's Night · The Beatles", status: "Matched" },
-  { setlist: "Things We Said Today", apple: "No match yet", status: "Unmatched" },
+  { setlist: "Can't Buy Me Love", apple: "Can't Buy Me Love · The Beatles", status: 'Matched' },
+  { setlist: "A Hard Day's Night", apple: "A Hard Day's Night · The Beatles", status: 'Matched' },
+  { setlist: 'Things We Said Today', apple: 'No match yet', status: 'Unmatched' },
 ];
 
 export default function DemoPage() {
@@ -81,7 +81,7 @@ export default function DemoPage() {
                 </div>
                 <div className="matching-track-result">{row.apple}</div>
                 <div className="matching-row-actions">
-                  <span className={`demo-pill ${row.status === "Matched" ? "ok" : "warn"}`}>
+                  <span className={`demo-pill ${row.status === 'Matched' ? 'ok' : 'warn'}`}>
                     {row.status}
                   </span>
                 </div>

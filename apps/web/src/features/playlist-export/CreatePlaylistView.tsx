@@ -1,19 +1,19 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useState } from "react";
-import { buildPlaylistName, dedupeTrackIdsOrdered } from "@repo/core";
-import { getErrorMessage } from "@repo/shared";
-import type { MatchRow } from "@/features/matching/types";
+import { useEffect, useMemo, useState } from 'react';
+import { buildPlaylistName, dedupeTrackIdsOrdered } from '@repo/core';
+import { getErrorMessage } from '@repo/shared';
+import type { MatchRow } from '@/features/matching/types';
 import {
   isMusicKitAuthorized,
   createLibraryPlaylist,
   addTracksToLibraryPlaylist,
-} from "@/lib/musickit";
-import { ErrorAlert } from "@/components/ErrorAlert";
-import { LoadingButton } from "@/components/LoadingButton";
-import { SectionTitle } from "@/components/SectionTitle";
-import { ConnectAppleMusic } from "@/features/matching/ConnectAppleMusic";
-import type { Setlist } from "@repo/core";
+} from '@/lib/musickit';
+import { ErrorAlert } from '@/components/ErrorAlert';
+import { LoadingButton } from '@/components/LoadingButton';
+import { SectionTitle } from '@/components/SectionTitle';
+import { ConnectAppleMusic } from '@/features/matching/ConnectAppleMusic';
+import type { Setlist } from '@repo/core';
 
 export interface CreatePlaylistViewProps {
   setlist: Setlist;
@@ -31,7 +31,7 @@ function resumeKey(setlistId: string): string {
 }
 
 function readResume(setlistId: string): ResumeState | null {
-  if (typeof window === "undefined") return null;
+  if (typeof window === 'undefined') return null;
   try {
     const raw = window.sessionStorage.getItem(resumeKey(setlistId));
     if (!raw) return null;
@@ -44,7 +44,7 @@ function readResume(setlistId: string): ResumeState | null {
 }
 
 function writeResume(setlistId: string, value: ResumeState | null): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === 'undefined') return;
   const key = resumeKey(setlistId);
   if (!value) {
     window.sessionStorage.removeItem(key);
@@ -89,7 +89,7 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
       }
 
       if (songIds.length === 0) {
-        setError("No tracks to add. Match at least one track first.");
+        setError('No tracks to add. Match at least one track first.');
         return;
       }
 
@@ -105,10 +105,10 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
         const resume: ResumeState = { id, url, remainingIds: [...songIds] };
         setResumeState(resume);
         writeResume(setlist.id, resume);
-        setAddTracksError(getErrorMessage(addErr, "Adding tracks failed."));
+        setAddTracksError(getErrorMessage(addErr, 'Adding tracks failed.'));
       }
     } catch (err) {
-      setError(getErrorMessage(err, "Failed to create playlist"));
+      setError(getErrorMessage(err, 'Failed to create playlist.'));
     } finally {
       setLoading(false);
     }
@@ -125,7 +125,7 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
       writeResume(setlist.id, null);
       setAddTracksError(null);
     } catch (err) {
-      setAddTracksError(getErrorMessage(err, "Adding tracks failed."));
+      setAddTracksError(getErrorMessage(err, 'Adding tracks failed.'));
     } finally {
       setLoading(false);
     }
@@ -139,13 +139,13 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
   if (created || resumeState) {
     const current = resumeState ?? created;
     const rawUrl = current?.url?.trim();
-    const isSafeUrl = rawUrl && (rawUrl.startsWith("http://") || rawUrl.startsWith("https://"));
+    const isSafeUrl = rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'));
     return (
       <div role="status" className="glass-panel success-panel">
         <p className="success-title">Playlist created.</p>
         {addTracksError ? (
           <>
-            <p className="error-text" style={{ marginTop: "0.5rem" }}>
+            <p className="error-text" style={{ marginTop: '0.5rem' }}>
               Playlist was created but adding tracks failed: {addTracksError}
             </p>
             <LoadingButton
@@ -153,7 +153,7 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
               onClick={handleAddRemainingTracks}
               loading={loading}
               loadingChildren="Adding…"
-              style={{ marginTop: "1rem" }}
+              style={{ marginTop: '1rem' }}
             >
               Resume adding remaining tracks
             </LoadingButton>
@@ -161,18 +161,18 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
         ) : (
           <>
             {isSafeUrl ? (
-              <p style={{ margin: "0.5rem 0 0" }}>
+              <p style={{ margin: '0.5rem 0 0' }}>
                 <a
                   href={rawUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ color: "var(--accent-primary)", textDecoration: "underline" }}
+                  style={{ color: 'var(--accent-primary)', textDecoration: 'underline' }}
                 >
                   Open in Apple Music →
                 </a>
               </p>
             ) : (
-              <p className="muted-block" style={{ marginTop: "0.5rem" }}>
+              <p className="muted-block" style={{ marginTop: '0.5rem' }}>
                 Open the Apple Music app and check your library for the new playlist.
               </p>
             )}
@@ -186,11 +186,11 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
   const dedupeSavings = selectedSongIds.length - songIds.length;
 
   return (
-    <section aria-label="Create playlist" className="glass-panel" style={{ marginTop: "2rem" }}>
+    <section aria-label="Create playlist" className="glass-panel" style={{ marginTop: '2rem' }}>
       <SectionTitle>Create playlist</SectionTitle>
       <p>
-        Ready to create a playlist with{" "}
-        <strong className="accent-inline">{count}</strong> track{count !== 1 ? "s" : ""}.
+        Ready to create a playlist with <strong className="accent-inline">{count}</strong> track
+        {count !== 1 ? 's' : ''}.
       </p>
 
       <label className="checkbox-row">
@@ -202,12 +202,14 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
         Remove duplicate tracks before export
       </label>
       {dedupeTracks && dedupeSavings > 0 && (
-        <p className="muted-caption">Deduplication will remove {dedupeSavings} duplicate track(s).</p>
+        <p className="muted-caption">
+          Deduplication will remove {dedupeSavings} duplicate track(s).
+        </p>
       )}
 
       {needsAuth && (
-        <div style={{ marginTop: "1.5rem" }}>
-          <p className="error-text" style={{ marginBottom: "0.75rem" }}>
+        <div style={{ marginTop: '1.5rem' }}>
+          <p className="error-text" style={{ marginBottom: '0.75rem' }}>
             Connect Apple Music to create the playlist in your library.
           </p>
           <ConnectAppleMusic onAuthorized={handleAuthorized} label="Connect Apple Music" />
@@ -220,7 +222,7 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
           disabled={count === 0}
           loading={loading}
           loadingChildren="Creating…"
-          style={{ marginTop: "1.5rem" }}
+          style={{ marginTop: '1.5rem' }}
           title="Create a new playlist in your Apple Music library with the matched tracks"
         >
           Create playlist

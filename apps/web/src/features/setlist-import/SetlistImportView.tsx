@@ -1,23 +1,19 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { FlowStepIndicator } from "@/components/FlowStepIndicator";
-import { ErrorAlert } from "@/components/ErrorAlert";
-import { LoadingButton } from "@/components/LoadingButton";
-import { SectionTitle } from "@/components/SectionTitle";
-import { StatusText } from "@/components/StatusText";
-import { ConnectAppleMusic } from "@/features/matching/ConnectAppleMusic";
-import { MatchingView } from "@/features/matching/MatchingView";
-import type { MatchRow } from "@/features/matching/types";
-import { CreatePlaylistView } from "@/features/playlist-export/CreatePlaylistView";
-import { SetlistPreview } from "./SetlistPreview";
-import { useSetlistImportState } from "./useSetlistImportState";
+import { useState } from 'react';
+import { FlowStepIndicator } from '@/components/FlowStepIndicator';
+import { ErrorAlert } from '@/components/ErrorAlert';
+import { LoadingButton } from '@/components/LoadingButton';
+import { SectionTitle } from '@/components/SectionTitle';
+import { StatusText } from '@/components/StatusText';
+import { ConnectAppleMusic } from '@/features/matching/ConnectAppleMusic';
+import { MatchingView } from '@/features/matching/MatchingView';
+import type { MatchRow } from '@/features/matching/types';
+import { CreatePlaylistView } from '@/features/playlist-export/CreatePlaylistView';
+import { SetlistPreview } from './SetlistPreview';
+import { useSetlistImportState } from './useSetlistImportState';
 
-function ConnectAppleMusicInline() {
-  return <ConnectAppleMusic label="Connect Apple Music" />;
-}
-
-type Step = "import" | "preview" | "matching" | "export";
+type Step = 'import' | 'preview' | 'matching' | 'export';
 
 export function SetlistImportView() {
   const {
@@ -32,60 +28,54 @@ export function SetlistImportView() {
     selectHistoryItem,
     clearHistory,
   } = useSetlistImportState();
-  const [step, setStep] = useState<Step>("import");
+  const [step, setStep] = useState<Step>('import');
   const [matchRows, setMatchRows] = useState<MatchRow[] | null>(null);
+  const truncatedInput = inputValue.length > 50 ? `${inputValue.slice(0, 50)}…` : inputValue;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const ok = await loadSetlist(inputValue);
-    if (ok) setStep("preview");
+    if (ok) setStep('preview');
   }
 
-  if (step === "matching" && setlist) {
+  if (step === 'matching' && setlist) {
     return (
       <section className="step-section">
         <FlowStepIndicator step={3} total={4} label="Matching" />
-        {inputValue.trim() && (
-          <p className="muted-caption">
-            Setlist: {inputValue.length > 50 ? `${inputValue.slice(0, 50)}…` : inputValue}
-          </p>
-        )}
+        {inputValue.trim() && <p className="muted-caption">Setlist: {truncatedInput}</p>}
         <button
           type="button"
-          onClick={() => setStep("preview")}
+          onClick={() => setStep('preview')}
           aria-label="Back to setlist preview"
           className="premium-button secondary"
         >
           ← Back to preview
         </button>
-        <p className="muted-block" style={{ marginTop: "0.75rem" }}>
+        <p className="muted-block" style={{ marginTop: '0.75rem' }}>
           Setlist: <strong>{setlist.artist}</strong>
-          {setlist.venue ? ` at ${setlist.venue}` : ""} — {(setlist.sets ?? []).flat().length} tracks.
+          {setlist.venue ? ` at ${setlist.venue}` : ''} — {(setlist.sets ?? []).flat().length}{' '}
+          tracks.
         </p>
-        <ConnectAppleMusicInline />
+        <ConnectAppleMusic />
         <MatchingView
           setlist={setlist}
           onProceedToCreatePlaylist={(matches) => {
             setMatchRows(matches);
-            setStep("export");
+            setStep('export');
           }}
         />
       </section>
     );
   }
 
-  if (step === "export" && setlist && matchRows) {
+  if (step === 'export' && setlist && matchRows) {
     return (
       <section className="step-section">
         <FlowStepIndicator step={4} total={4} label="Export" />
-        {inputValue.trim() && (
-          <p className="muted-caption">
-            Setlist: {inputValue.length > 50 ? `${inputValue.slice(0, 50)}…` : inputValue}
-          </p>
-        )}
+        {inputValue.trim() && <p className="muted-caption">Setlist: {truncatedInput}</p>}
         <button
           type="button"
-          onClick={() => setStep("matching")}
+          onClick={() => setStep('matching')}
           aria-label="Back to matching"
           className="premium-button secondary"
         >
@@ -98,11 +88,14 @@ export function SetlistImportView() {
 
   return (
     <section aria-label="Import setlist" className="glass-panel import-panel">
-      <FlowStepIndicator step={step === "preview" ? 2 : 1} total={4} label={step === "preview" ? "Preview" : "Import"} />
+      <FlowStepIndicator
+        step={step === 'preview' ? 2 : 1}
+        total={4}
+        label={step === 'preview' ? 'Preview' : 'Import'}
+      />
       <SectionTitle>Import</SectionTitle>
       <p className="muted-block">
-        Enter a setlist.fm URL or setlist ID (e.g.{" "}
-        <code className="accent-inline">63de4613</code>).
+        Enter a setlist.fm URL or setlist ID (e.g. <code className="accent-inline">63de4613</code>).
       </p>
 
       <form onSubmit={handleSubmit} className="import-form">
@@ -119,7 +112,7 @@ export function SetlistImportView() {
             placeholder="https://www.setlist.fm/... or 63de4613"
             disabled={loading}
             aria-invalid={!!error}
-            aria-describedby={error ? "setlist-error" : undefined}
+            aria-describedby={error ? 'setlist-error' : undefined}
           />
         </div>
         <LoadingButton
@@ -127,7 +120,7 @@ export function SetlistImportView() {
           loading={loading}
           loadingChildren="Loading…"
           disabled={!inputValue.trim()}
-          style={{ height: "46px" }}
+          style={{ height: '46px' }}
           title="Fetch setlist from setlist.fm"
         >
           Load setlist
@@ -160,7 +153,9 @@ export function SetlistImportView() {
       )}
 
       {loading && (
-        <StatusText style={{ color: "var(--accent-primary)", fontWeight: 500, marginTop: "0.5rem" }}>
+        <StatusText
+          style={{ color: 'var(--accent-primary)', fontWeight: 500, marginTop: '0.5rem' }}
+        >
           Loading setlist…
         </StatusText>
       )}
@@ -171,16 +166,15 @@ export function SetlistImportView() {
         </div>
       )}
 
-      {setlist && step === "preview" && (
+      {setlist && step === 'preview' && (
         <>
-          <FlowStepIndicator step={2} total={4} label="Preview" />
           {inputValue.trim() && <p className="muted-caption">Setlist: {inputValue}</p>}
           <SetlistPreview setlist={setlist} />
           <button
             type="button"
             className="premium-button"
-            onClick={() => setStep("matching")}
-            style={{ marginTop: "1.5rem" }}
+            onClick={() => setStep('matching')}
+            style={{ marginTop: '1.5rem' }}
           >
             Continue to Matching →
           </button>

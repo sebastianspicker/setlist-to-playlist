@@ -1,5 +1,5 @@
-import type { DevTokenResponse } from "@repo/shared";
-import { signDeveloperToken } from "../../lib/jwt.js";
+import type { DevTokenResponse } from '@repo/shared';
+import { signDeveloperToken } from '../../lib/jwt.js';
 
 export type { DevTokenResponse };
 
@@ -15,7 +15,7 @@ export async function handleDevToken(): Promise<DevTokenResponse> {
   const privateKey = process.env.APPLE_PRIVATE_KEY?.trim();
 
   if (!teamId || !keyId || !privateKey) {
-    return { error: "Missing Apple credentials in environment" };
+    return { error: 'Missing Apple credentials in environment.' };
   }
 
   try {
@@ -27,11 +27,11 @@ export async function handleDevToken(): Promise<DevTokenResponse> {
     return { token };
   } catch (err) {
     // DCI-015: Log signing error safely on the server. Do NOT log the 'privateKey' itself.
-    console.error("Apple Developer Token signing failed:", {
+    console.error('Apple Developer Token signing failed:', {
       teamId,
       keyId,
       error: err instanceof Error ? err.message : String(err),
     });
-    return { error: "Token signing failed. Check server configuration and logs." };
+    return { error: 'Token signing failed. Check server configuration and logs.' };
   }
 }

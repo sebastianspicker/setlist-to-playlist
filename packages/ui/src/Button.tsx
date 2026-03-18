@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
-export type ButtonVariant = "primary" | "secondary";
+export type ButtonVariant = 'primary' | 'secondary';
 
-export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {
+export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> {
   /** Visual variant. */
   variant?: ButtonVariant;
   /** When true, disables the button and sets aria-busy. */
@@ -19,16 +19,16 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
  * Use for consistent CTAs; consumer can pass className (e.g. "premium-button") and style overrides.
  */
 export function Button({
-  variant = "primary",
+  variant = 'primary',
   loading = false,
-  loadingChildren = "Loading…",
+  loadingChildren = 'Loading…',
   children,
   disabled,
   className,
-  type = "button",
+  type = 'button',
   ...rest
 }: ButtonProps) {
-  const variantClass = variant === "secondary" ? "premium-button secondary" : "premium-button";
+  const variantClass = variant === 'secondary' ? 'premium-button secondary' : 'premium-button';
   return (
     <button
       type={type}

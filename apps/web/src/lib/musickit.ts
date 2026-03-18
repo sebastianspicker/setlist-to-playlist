@@ -1,1 +1,1 @@
-export * from "./musickit/index";
+export * from './musickit/index';

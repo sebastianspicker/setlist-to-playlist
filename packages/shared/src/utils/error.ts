@@ -4,9 +4,9 @@
 export function isErrorLike(value: unknown): value is { message: string } {
   return (
     value != null &&
-    typeof value === "object" &&
-    "message" in value &&
-    typeof (value as { message: unknown }).message === "string"
+    typeof value === 'object' &&
+    'message' in value &&
+    typeof (value as { message: unknown }).message === 'string'
   );
 }
 
