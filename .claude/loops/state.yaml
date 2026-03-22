@@ -8,10 +8,10 @@ baseline:
   ci_status: green
 
 current:
-  test_count: 208
+  test_count: 214
   phase: "r2-02-component-tests"
-  sub_phase: "01-hook-tests"
-  item: "use-matching-suggestions-tests"
+  sub_phase: "02-view-tests"
+  item: "setlist-import-view-tests"
 
 phases:
   # ──────────────────────────────────────────────
@@ -52,16 +52,16 @@ phases:
     completed: null
     sub_phases:
       01-hook-tests:
-        status: in-progress
+        status: complete
         max_iterations: 8
-        iterations_used: 1
+        iterations_used: 2
         items:
           - id: use-flow-state-tests
             status: complete
             notes: "6 tests: initial state, goToPreview, goToMatching, goToExport with matchRows, goBackToPreview, goBackToMatching. All pass."
           - id: use-matching-suggestions-tests
-            status: not-started
-            description: "Test useMatchingSuggestions: autoMatchAll batching, setMatch, skipUnmatched, resetMatches, stale-run detection"
+            status: complete
+            notes: "6 tests: initial state, initial matches from entries, autoMatchAll calls searchCatalog, setMatch updates row, skipUnmatched marks skipped, resetMatches clears. All pass."
 
       02-view-tests:
         status: not-started
