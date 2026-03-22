@@ -60,6 +60,7 @@ export function TrackSearchPanel({
                 type="button"
                 onClick={() => onChoose(track)}
                 className="search-result-button"
+                aria-label={`Select ${track.name}${track.artistName ? ` by ${track.artistName}` : ''}`}
               >
                 {track.name}
                 {track.artistName ? ` · ${track.artistName}` : ''}

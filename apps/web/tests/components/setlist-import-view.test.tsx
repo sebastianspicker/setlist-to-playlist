@@ -12,15 +12,27 @@ vi.mock('../../src/components/ErrorAlert', () => ({
     React.createElement('div', { role: 'alert' }, message),
 }));
 vi.mock('../../src/components/LoadingButton', () => ({
-  LoadingButton: (props: React.ButtonHTMLAttributes<HTMLButtonElement> & { loading?: boolean; loadingChildren?: string }) =>
-    React.createElement('button', { ...props, disabled: props.disabled || props.loading }, props.loading ? props.loadingChildren : props.children),
+  LoadingButton: (
+    props: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+      loading?: boolean;
+      loadingChildren?: string;
+    }
+  ) =>
+    React.createElement(
+      'button',
+      { ...props, disabled: props.disabled || props.loading },
+      props.loading ? props.loadingChildren : props.children
+    ),
 }));
 vi.mock('../../src/components/SectionTitle', () => ({
   SectionTitle: ({ children }: { children: React.ReactNode }) =>
     React.createElement('h2', null, children),
 }));
 vi.mock('../../src/components/StatusText', () => ({
-  StatusText: ({ children, ...props }: React.HTMLAttributes<HTMLParagraphElement> & { children: React.ReactNode }) =>
+  StatusText: ({
+    children,
+    ...props
+  }: React.HTMLAttributes<HTMLParagraphElement> & { children: React.ReactNode }) =>
     React.createElement('p', props, children),
 }));
 vi.mock('../../src/features/matching/ConnectAppleMusic', () => ({
@@ -64,8 +76,8 @@ vi.mock('../../src/features/setlist-import/useFlowState', () => ({
 
 vi.mock('next/dynamic', () => ({
   __esModule: true,
-  default: (loader: () => Promise<unknown>) => {
-    const DynamicStub = (props: Record<string, unknown>) => null;
+  default: (_loader: () => Promise<unknown>) => {
+    const DynamicStub = (_props: Record<string, unknown>) => null;
     DynamicStub.displayName = 'DynamicComponent';
     return DynamicStub;
   },

@@ -1,19 +1,31 @@
 'use client';
 
-import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { FlowStepIndicator } from '@/components/FlowStepIndicator';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { LoadingButton } from '@/components/LoadingButton';
 import { SectionTitle } from '@/components/SectionTitle';
 import { StatusText } from '@/components/StatusText';
 import { ConnectAppleMusic } from '@/features/matching/ConnectAppleMusic';
-import { MatchingView } from '@/features/matching/MatchingView';
-import type { MatchRow } from '@/features/matching/types';
-import { CreatePlaylistView } from '@/features/playlist-export/CreatePlaylistView';
 import { SetlistPreview } from './SetlistPreview';
+import { useFlowState } from './useFlowState';
 import { useSetlistImportState } from './useSetlistImportState';
 
-type Step = 'import' | 'preview' | 'matching' | 'export';
+const MatchingView = dynamic(
+  () =>
+    import('@/features/matching/MatchingView').then((m) => ({
+      default: m.MatchingView,
+    })),
+  { loading: () => <StatusText>Loading matching…</StatusText> }
+);
+
+const CreatePlaylistView = dynamic(
+  () =>
+    import('@/features/playlist-export/CreatePlaylistView').then((m) => ({
+      default: m.CreatePlaylistView,
+    })),
+  { loading: () => <StatusText>Loading export…</StatusText> }
+);
 
 export function SetlistImportView() {
   const {
@@ -28,24 +40,32 @@ export function SetlistImportView() {
     selectHistoryItem,
     clearHistory,
   } = useSetlistImportState();
-  const [step, setStep] = useState<Step>('import');
-  const [matchRows, setMatchRows] = useState<MatchRow[] | null>(null);
+  const {
+    step,
+    matchRows,
+    stepContainerRef,
+    goToPreview,
+    goToMatching,
+    goToExport,
+    goBackToPreview,
+    goBackToMatching,
+  } = useFlowState();
   const truncatedInput = inputValue.length > 50 ? `${inputValue.slice(0, 50)}…` : inputValue;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const ok = await loadSetlist(inputValue);
-    if (ok) setStep('preview');
+    if (ok) goToPreview();
   }
 
   if (step === 'matching' && setlist) {
     return (
-      <section className="step-section">
+      <section ref={stepContainerRef} className="step-section" aria-label="Matching step">
         <FlowStepIndicator step={3} total={4} label="Matching" />
         {inputValue.trim() && <p className="muted-caption">Setlist: {truncatedInput}</p>}
         <button
           type="button"
-          onClick={() => setStep('preview')}
+          onClick={goBackToPreview}
           aria-label="Back to setlist preview"
           className="premium-button secondary"
         >
@@ -60,8 +80,7 @@ export function SetlistImportView() {
         <MatchingView
           setlist={setlist}
           onProceedToCreatePlaylist={(matches) => {
-            setMatchRows(matches);
-            setStep('export');
+            goToExport(matches);
           }}
         />
       </section>
@@ -70,12 +89,12 @@ export function SetlistImportView() {
 
   if (step === 'export' && setlist && matchRows) {
     return (
-      <section className="step-section">
+      <section ref={stepContainerRef} className="step-section" aria-label="Export step">
         <FlowStepIndicator step={4} total={4} label="Export" />
         {inputValue.trim() && <p className="muted-caption">Setlist: {truncatedInput}</p>}
         <button
           type="button"
-          onClick={() => setStep('matching')}
+          onClick={goBackToMatching}
           aria-label="Back to matching"
           className="premium-button secondary"
         >
@@ -87,7 +106,11 @@ export function SetlistImportView() {
   }
 
   return (
-    <section aria-label="Import setlist" className="glass-panel import-panel">
+    <section
+      ref={stepContainerRef}
+      aria-label="Import setlist"
+      className="glass-panel import-panel"
+    >
       <FlowStepIndicator
         step={step === 'preview' ? 2 : 1}
         total={4}
@@ -173,7 +196,7 @@ export function SetlistImportView() {
           <button
             type="button"
             className="premium-button"
-            onClick={() => setStep('matching')}
+            onClick={goToMatching}
             style={{ marginTop: '1.5rem' }}
           >
             Continue to Matching →
