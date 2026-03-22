@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.2.0] – 2026-03-22
+
+### Fixed
+
+- MusicKit `writeResume` now handles `QuotaExceededError` gracefully instead of crashing
+- Replaced inline type assertion in `playlist.ts` with proper `MusicKitAddTracksResponse` type
+
+### Security
+
+- Added Content-Security-Policy middleware with MusicKit CDN and Apple API whitelist
+- Added `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` headers via middleware
+
+### Testing
+
+- Added MusicKit client integration tests (init, cache, failure reset, concurrency, missing config)
+- Total test count: 202 (up from 197)
+
+### Analysis
+
+- Full happy-path trace of import→preview→match→export flow
+- Error path audit confirming all network failures surface user-visible messages
+- Concurrency audit confirming race condition guards across all async operations
+- Browser edge case audit (JS disabled, storage blocked, slow network, CDN blocked)
+
 ## [Unreleased]
 
 ### Documentation & Cleanup
