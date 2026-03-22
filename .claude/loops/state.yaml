@@ -8,10 +8,10 @@ baseline:
   ci_status: green
 
 current:
-  test_count: 202
+  test_count: 208
   phase: "r2-02-component-tests"
   sub_phase: "01-hook-tests"
-  item: "use-flow-state-tests"
+  item: "use-matching-suggestions-tests"
 
 phases:
   # ──────────────────────────────────────────────
@@ -44,21 +44,21 @@ phases:
   # R2 Phase 2: Component & Hook Tests (unblocked)
   # ──────────────────────────────────────────────
   r2-02-component-tests:
-    status: not-started
+    status: in-progress
     read_only: false
-    branch: ralph/r2-component-tests
+    branch: ralph/02-refactoring
     ci_verified: false
-    started: null
+    started: "2026-03-22T09:15:00Z"
     completed: null
     sub_phases:
       01-hook-tests:
-        status: not-started
+        status: in-progress
         max_iterations: 8
-        iterations_used: 0
+        iterations_used: 1
         items:
           - id: use-flow-state-tests
-            status: not-started
-            description: "Test useFlowState: initial state, forward/back transitions, matchRows storage"
+            status: complete
+            notes: "6 tests: initial state, goToPreview, goToMatching, goToExport with matchRows, goBackToPreview, goBackToMatching. All pass."
           - id: use-matching-suggestions-tests
             status: not-started
             description: "Test useMatchingSuggestions: autoMatchAll batching, setMatch, skipUnmatched, resetMatches, stale-run detection"
