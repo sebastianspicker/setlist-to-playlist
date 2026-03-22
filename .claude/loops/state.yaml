@@ -8,9 +8,9 @@ baseline:
 
 current:
   test_count: 197
-  phase: "04-security"
-  sub_phase: "05-csp-headers"
-  item: "csp-middleware"
+  phase: "05-testing"
+  sub_phase: "03-component-hook-tests"
+  item: "musickit-client-tests"
 
 phases:
   # ──────────────────────────────────────────────
@@ -281,12 +281,12 @@ phases:
   # Phase 4: Security & Hardening (was Phase 3)
   # ──────────────────────────────────────────────
   04-security:
-    status: in-progress
+    status: complete
     read_only: false
     branch: ralph/03-security
-    ci_verified: false
+    ci_verified: true
     started: "2026-03-22T00:00:00Z"
-    completed: null
+    completed: "2026-03-22T07:35:00Z"
     sub_phases:
       01-supply-chain:
         status: complete
@@ -373,19 +373,19 @@ phases:
             notes: "Error codes consistent across routes"
 
       05-csp-headers:
-        status: not-started
+        status: complete
         max_iterations: 6
-        iterations_used: 0
+        iterations_used: 1
         items:
           - id: csp-middleware
-            status: not-started
-            description: "Add Content-Security-Policy header via Next.js middleware"
+            status: complete
+            notes: "Created apps/web/middleware.ts with CSP, X-Content-Type-Options, X-Frame-Options, Referrer-Policy. Dev mode includes unsafe-eval for Next.js HMR."
           - id: csp-musickit-cdn
-            status: not-started
-            description: "Whitelist js-cdn.music.apple.com in script-src"
+            status: complete
+            notes: "Included in middleware: script-src has https://js-cdn.music.apple.com"
           - id: csp-api-connect
-            status: not-started
-            description: "Whitelist API endpoints in connect-src"
+            status: complete
+            notes: "Included in middleware: connect-src has https://api.music.apple.com https://*.apple.com"
 
   # ──────────────────────────────────────────────
   # Phase 5: Testing & Reliability (was Phase 4)
