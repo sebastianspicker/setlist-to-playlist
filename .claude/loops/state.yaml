@@ -11,7 +11,7 @@ current:
   test_count: 202
   phase: "r2-01-test-infra"
   sub_phase: "01-install-deps"
-  item: "configure-vitest-jsdom"
+  item: "verify-setup"
 
 phases:
   # ──────────────────────────────────────────────
@@ -28,14 +28,14 @@ phases:
       01-install-deps:
         status: in-progress
         max_iterations: 4
-        iterations_used: 1
+        iterations_used: 2
         items:
           - id: install-testing-library
             status: complete
             notes: "Installed @testing-library/react@16.3.2, @testing-library/jest-dom@6.9.1, jsdom@29.0.1 in apps/web devDeps"
           - id: configure-vitest-jsdom
-            status: not-started
-            description: "Update apps/web/vitest.config.ts to support jsdom environment via per-file directive"
+            status: complete
+            notes: "Created tests/setup.ts with @testing-library/jest-dom/vitest import. Updated vitest.config.ts with setupFiles. Per-file jsdom via // @vitest-environment jsdom directive."
           - id: verify-setup
             status: not-started
             description: "Create a minimal render test to verify @testing-library/react works with vitest"
