@@ -8,9 +8,9 @@ baseline:
 
 current:
   test_count: 197
-  phase: "02-bugs"
-  sub_phase: "02-type-safety-fixes"
-  item: "json-parse-narrowing"
+  phase: "04-security"
+  sub_phase: "05-csp-headers"
+  item: "csp-middleware"
 
 phases:
   # ──────────────────────────────────────────────
@@ -118,12 +118,12 @@ phases:
   # Phase 2: Bug Fixing & Issue Resolution (NEW)
   # ──────────────────────────────────────────────
   02-bugs:
-    status: in-progress
+    status: complete
     read_only: false
     branch: ralph/02-refactoring
-    ci_verified: false
+    ci_verified: true
     started: "2026-03-22T07:15:00Z"
-    completed: null
+    completed: "2026-03-22T07:30:00Z"
     sub_phases:
       01-p0-p1-fixes:
         status: complete
@@ -140,40 +140,40 @@ phases:
             severity: P1
 
       02-type-safety-fixes:
-        status: in-progress
+        status: complete
         max_iterations: 6
-        iterations_used: 1
+        iterations_used: 2
         items:
           - id: musickit-api-casts
             status: complete
             notes: "catalog.ts and playlist.ts already use well-defined types (MusicKitSearchResponse, MusicKitPlaylistCreateResponse). Added MusicKitAddTracksResponse type to replace inline cast in playlist.ts:51-53. All response types use optional fields with optional chaining in consuming code."
           - id: json-parse-narrowing
-            status: not-started
-            description: "Improve JSON.parse(raw) as unknown patterns with proper validation"
+            status: complete
+            notes: "Reviewed all JSON.parse patterns: (1) useSetlistImportState readHistory uses 'as unknown' then validates with Array.isArray + type guard filter — properly validated. (2) useCreatePlaylistState readResume uses 'as ResumeState' but follows with checks on parsed?.id and Array.isArray(parsed?.remainingIds) — sufficient validation for self-written sessionStorage data. No code change needed."
 
       03-logic-errors:
-        status: not-started
+        status: complete
         max_iterations: 6
-        iterations_used: 0
+        iterations_used: 2
         items:
           - id: concurrent-token-refresh
-            status: not-started
-            description: "Verify promise-singleton in token.ts handles all race conditions"
+            status: complete
+            notes: "VERIFIED: promise-singleton in token.ts handles all scenarios correctly. Concurrent calls share pendingFetch promise. Failed fetch clears pendingFetch for retry. Malformed response validated by isDevTokenSuccess before caching. After success, pendingFetch cleared and cachedToken set for future isTokenValid() checks."
           - id: cache-eviction-edge
-            status: not-started
-            description: "Test cache cleanup in setlistfm.ts and catalog.ts for edge cases"
+            status: complete
+            notes: "VERIFIED: Both caches are safe from eviction races. JS single-threaded execution means no interleaving between read and eviction. setlistfm.ts evicts only after write (expired entries only). catalog.ts evicts before API call but after cache-hit check. No entry can be evicted while being read."
 
       04-error-handling-gaps:
-        status: not-started
+        status: complete
         max_iterations: 6
-        iterations_used: 0
+        iterations_used: 2
         items:
           - id: network-failure-ux
-            status: not-started
-            description: "Audit what user sees when fetch fails mid-operation"
+            status: complete
+            notes: "VERIFIED: All network failure paths surface user-visible errors with retry. fetchJson throws on network error → caught by loadSetlist → ErrorAlert with retry. MusicKit search failure → Promise.allSettled → warning banner. Playlist creation failure → caught by handleCreate → ErrorAlert with retry. No silent failures found."
           - id: storage-quota-exceeded
-            status: not-started
-            description: "Handle localStorage/sessionStorage quota exceeded errors"
+            status: complete
+            notes: "Fixed writeResume in useCreatePlaylistState.ts — wrapped sessionStorage.setItem and removeItem in try-catch to handle QuotaExceededError and blocked storage. Resume is a best-effort feature, graceful degradation is appropriate."
 
   # ──────────────────────────────────────────────
   # Phase 3: Code Quality & Refactoring (was Phase 2)
