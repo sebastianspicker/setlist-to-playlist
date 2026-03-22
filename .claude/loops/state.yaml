@@ -1,775 +1,158 @@
 version: 2
-last_updated: "2026-03-22T08:00:00Z"
+round: 2
+last_updated: "2026-03-22T08:30:00Z"
 
 baseline:
-  test_count: 197
+  test_count: 202
   build_warnings: 0
   ci_status: green
 
 current:
   test_count: 202
-  phase: "08-ship-review"
-  sub_phase: "04-version-changelog"
-  item: null
+  phase: "r2-01-test-infra"
+  sub_phase: "01-install-deps"
+  item: "install-testing-library"
 
 phases:
   # ──────────────────────────────────────────────
-  # Phase 1: Analysis & Discovery (READ-ONLY)
+  # R2 Phase 1: Testing Infrastructure
   # ──────────────────────────────────────────────
-  01-analysis:
-    status: complete
-    read_only: true
-    branch: null
-    ci_verified: true
-    started: "2026-03-22T00:00:00Z"
-    completed: "2026-03-22T07:10:00Z"
-    sub_phases:
-      01-static-analysis:
-        status: complete
-        max_iterations: 8
-        iterations_used: 6
-        items:
-          - id: typescript-strictness
-            status: complete
-            notes: "16 findings; noUncheckedIndexedAccess enabled"
-          - id: dead-code
-            status: complete
-            notes: "No significant dead code found"
-          - id: type-safety-gaps
-            status: complete
-            notes: "MusicKit casts, JSON.parse patterns identified"
-          - id: eslint-gaps
-            status: complete
-            notes: "react-hooks/exhaustive-deps enforced"
-
-      02-dependency-graph:
-        status: complete
-        max_iterations: 6
-        iterations_used: 4
-        items:
-          - id: package-dependency-direction
-            status: complete
-            notes: "Clean dependency graph, no violations"
-          - id: internal-external-boundary
-            status: complete
-            notes: "No boundary violations"
-          - id: feature-boundary-validation
-            status: complete
-            notes: "Features are self-contained"
-          - id: barrel-export-analysis
-            status: complete
-            notes: "Barrel exports are selective and appropriate"
-
-      03-test-coverage-gaps:
-        status: complete
-        max_iterations: 6
-        iterations_used: 4
-        items:
-          - id: inventory-current-tests
-            status: complete
-            notes: "55 tests across 12 files mapped"
-          - id: untested-source-files
-            status: complete
-            notes: "38% coverage gap mapped; musickit, components, hooks untested"
-          - id: test-quality-assessment
-            status: complete
-            notes: "Tests are behavior-focused; error paths covered in core"
-          - id: integration-e2e-gap
-            status: complete
-            notes: "No integration or E2E tests; route handlers untested"
-
-      04-performance-profiling:
-        status: complete
-        max_iterations: 6
-        iterations_used: 4
-        items:
-          - id: bundle-analysis
-            status: complete
-            notes: "3 HIGH priority items identified"
-          - id: react-rerender-risks
-            status: complete
-            notes: "3 MEDIUM priority items identified"
-          - id: network-caching
-            status: complete
-            notes: "Cache strategies documented"
-          - id: css-rendering
-            status: complete
-            notes: "3 LOW priority items identified"
-
-      05-bug-discovery:
-        status: complete
-        max_iterations: 8
-        iterations_used: 4
-        items:
-          - id: trace-happy-paths
-            status: complete
-            notes: "Traced full import→preview→matching→export flow. Found: (1) writeResume in useCreatePlaylistState.ts has no try-catch on sessionStorage.setItem — will crash if quota exceeded (confirms Phase 2 storage-quota bug). (2) initPromise reset is already implemented in client.ts:59-61 (Phase 2 item is verify-only). (3) fetchJson uses as T cast — type safety gap (confirms Phase 2 type-safety item). No logic bugs in happy path flow."
-          - id: trace-error-paths
-            status: complete
-            notes: "Traced all error paths: setlist.fm 404/500/429 fully handled with retry; Apple Music search errors caught by allSettled with warning banner; token fetch resets on error; MusicKit init resets on error. Found: (1) ConnectAppleMusic.handleDisconnect calls onAuthorized after unauthorize — misleading callback triggers handleCreate which fails gracefully but causes UX flash. (2) All other error paths properly surface user-visible messages via ErrorAlert components."
-          - id: concurrent-scenarios
-            status: complete
-            notes: "All major concurrency patterns verified: (1) setlist import uses AbortController + currentRequestRef for stale-request detection. (2) Track search uses searchRunIdRef for stale-run detection. (3) Token fetch uses promise singleton with proper reset on failure. (4) autoMatchAll uses runIdRef for stale-run detection with batch processing. (5) Minor: handleCreate in useCreatePlaylistState has no explicit guard against double invocation — UI disables button via loading state but handleAuthorized could theoretically double-invoke. Low severity."
-          - id: browser-edge-cases
-            status: complete
-            notes: "Checked 4 scenarios: (1) JS disabled — page renders SSR content (instructions, form HTML) but is non-functional. No noscript fallback but acceptable. (2) Cookies/storage blocked — readHistory/writeHistory have try-catch, readResume has try-catch, but writeResume LACKS try-catch (confirmed storage-quota bug). MusicKit auth failure handled gracefully. (3) Slow network — all async flows have loading indicators (LoadingButton, StatusText, dynamic import fallbacks). (4) MusicKit CDN blocked — 10s timeout in waitForMusicKit, error propagates and resets initPromise, ConnectAppleMusic shows error."
-
-  # ──────────────────────────────────────────────
-  # Phase 2: Bug Fixing & Issue Resolution (NEW)
-  # ──────────────────────────────────────────────
-  02-bugs:
-    status: complete
+  r2-01-test-infra:
+    status: not-started
     read_only: false
-    branch: ralph/02-refactoring
-    ci_verified: true
-    started: "2026-03-22T07:15:00Z"
-    completed: "2026-03-22T07:30:00Z"
+    branch: ralph/r2-test-infra
+    ci_verified: false
+    started: null
+    completed: null
     sub_phases:
-      01-p0-p1-fixes:
-        status: complete
-        max_iterations: 6
-        iterations_used: 2
-        items:
-          - id: musickit-init-promise-reset
-            status: complete
-            notes: "VERIFIED: initPromise = null already implemented in client.ts:60 catch block. No code change needed."
-            severity: P0
-          - id: playlist-error-after-success
-            status: complete
-            notes: "VERIFIED: playlist.ts addTracksToLibraryPlaylist no longer throws after success. throwIfMusicKitError only throws if response contains errors. Fix confirmed in place."
-            severity: P1
-
-      02-type-safety-fixes:
-        status: complete
-        max_iterations: 6
-        iterations_used: 2
-        items:
-          - id: musickit-api-casts
-            status: complete
-            notes: "catalog.ts and playlist.ts already use well-defined types (MusicKitSearchResponse, MusicKitPlaylistCreateResponse). Added MusicKitAddTracksResponse type to replace inline cast in playlist.ts:51-53. All response types use optional fields with optional chaining in consuming code."
-          - id: json-parse-narrowing
-            status: complete
-            notes: "Reviewed all JSON.parse patterns: (1) useSetlistImportState readHistory uses 'as unknown' then validates with Array.isArray + type guard filter — properly validated. (2) useCreatePlaylistState readResume uses 'as ResumeState' but follows with checks on parsed?.id and Array.isArray(parsed?.remainingIds) — sufficient validation for self-written sessionStorage data. No code change needed."
-
-      03-logic-errors:
-        status: complete
-        max_iterations: 6
-        iterations_used: 2
-        items:
-          - id: concurrent-token-refresh
-            status: complete
-            notes: "VERIFIED: promise-singleton in token.ts handles all scenarios correctly. Concurrent calls share pendingFetch promise. Failed fetch clears pendingFetch for retry. Malformed response validated by isDevTokenSuccess before caching. After success, pendingFetch cleared and cachedToken set for future isTokenValid() checks."
-          - id: cache-eviction-edge
-            status: complete
-            notes: "VERIFIED: Both caches are safe from eviction races. JS single-threaded execution means no interleaving between read and eviction. setlistfm.ts evicts only after write (expired entries only). catalog.ts evicts before API call but after cache-hit check. No entry can be evicted while being read."
-
-      04-error-handling-gaps:
-        status: complete
-        max_iterations: 6
-        iterations_used: 2
-        items:
-          - id: network-failure-ux
-            status: complete
-            notes: "VERIFIED: All network failure paths surface user-visible errors with retry. fetchJson throws on network error → caught by loadSetlist → ErrorAlert with retry. MusicKit search failure → Promise.allSettled → warning banner. Playlist creation failure → caught by handleCreate → ErrorAlert with retry. No silent failures found."
-          - id: storage-quota-exceeded
-            status: complete
-            notes: "Fixed writeResume in useCreatePlaylistState.ts — wrapped sessionStorage.setItem and removeItem in try-catch to handle QuotaExceededError and blocked storage. Resume is a best-effort feature, graceful degradation is appropriate."
-
-  # ──────────────────────────────────────────────
-  # Phase 3: Code Quality & Refactoring (was Phase 2)
-  # ──────────────────────────────────────────────
-  03-refactoring:
-    status: complete
-    read_only: false
-    branch: ralph/02-refactoring
-    ci_verified: true
-    started: "2026-03-22T00:00:00Z"
-    completed: "2026-03-22T00:00:00Z"
-    sub_phases:
-      01-extract-hooks:
-        status: complete
-        max_iterations: 6
-        iterations_used: 3
-        items:
-          - id: create-playlist-state-extraction
-            status: complete
-            notes: "Extracted useCreatePlaylistState"
-          - id: matching-search-state-extraction
-            status: complete
-            notes: "Extracted useTrackSearch + React.memo"
-          - id: setlist-import-step-machine
-            status: complete
-            notes: "Extracted useFlowState"
-
-      02-component-decomposition:
-        status: complete
-        max_iterations: 6
-        iterations_used: 1
-        items:
-          - id: create-playlist-rendering-split
-            status: skipped
-            notes: "Sizes acceptable after hook extraction"
-          - id: setlist-import-step-rendering
-            status: skipped
-            notes: "Sizes acceptable after hook extraction"
-          - id: match-row-simplification
-            status: skipped
-            notes: "Sizes acceptable after hook extraction"
-
-      03-pattern-unification:
-        status: complete
-        max_iterations: 8
-        iterations_used: 5
-        items:
-          - id: state-reset-patterns
-            status: complete
-            notes: "Unified reset patterns"
-          - id: error-handling-pattern
-            status: complete
-            notes: "Unified error handling"
-          - id: musickit-api-response-parsing
-            status: complete
-            notes: "autoMatchAll batched 5x, MusicKit afterInteractive"
-          - id: cache-eviction-pattern
-            status: complete
-            notes: "Unified cache eviction"
-          - id: storage-read-write-pattern
-            status: complete
-            notes: "Unified storage patterns"
-
-      04-type-strengthening:
-        status: complete
-        max_iterations: 8
-        iterations_used: 4
-        items:
-          - id: musickit-api-response-types
-            status: complete
-            notes: "MusicKit types + throwIfMusicKitError"
-          - id: json-parse-safety
-            status: complete
-          - id: mapper-double-cast
-            status: complete
-          - id: fetchjson-generic-safety
-            status: complete
-          - id: matchrow-status-discriminated-union
-            status: complete
-          - id: api-error-code-exhaustiveness
-            status: complete
-
-      05-modernize-patterns:
-        status: complete
-        max_iterations: 6
-        iterations_used: 0
-        items:
-          - id: react-19-use-hook
-            status: skipped
-            notes: "MERGED into pattern unification (2.3)"
-          - id: react-19-action-state
-            status: skipped
-            notes: "MERGED into pattern unification (2.3)"
-          - id: nextjs-16-cache
-            status: skipped
-            notes: "MERGED into pattern unification (2.3)"
-          - id: react-19-ref-as-prop
-            status: skipped
-            notes: "MERGED into pattern unification (2.3)"
-          - id: nextjs-16-ppr
-            status: skipped
-            notes: "MERGED into pattern unification (2.3)"
-
-  # ──────────────────────────────────────────────
-  # Phase 4: Security & Hardening (was Phase 3)
-  # ──────────────────────────────────────────────
-  04-security:
-    status: complete
-    read_only: false
-    branch: ralph/03-security
-    ci_verified: true
-    started: "2026-03-22T00:00:00Z"
-    completed: "2026-03-22T07:35:00Z"
-    sub_phases:
-      01-supply-chain:
-        status: complete
-        max_iterations: 8
-        iterations_used: 1
-        items:
-          - id: github-actions-pin-audit
-            status: skipped
-            notes: "Already hardened"
-          - id: dependency-lock-integrity
-            status: skipped
-            notes: "Already hardened"
-          - id: musickit-script-sri
-            status: skipped
-            notes: "Apple does not publish stable hash"
-          - id: csp-headers
-            status: skipped
-            notes: "Deferred to new 05-csp-headers sub-phase"
-          - id: bundled-asset-sri
-            status: skipped
-            notes: "Already hardened"
-
-      02-token-hardening:
-        status: complete
-        max_iterations: 8
-        iterations_used: 5
-        items:
-          - id: developer-token-lifecycle
-            status: complete
-            notes: "5-min buffer verified sufficient"
-          - id: token-refresh-race-condition
-            status: complete
-            notes: "Promise-singleton implemented for fetchDeveloperToken"
-          - id: user-token-security
-            status: complete
-            notes: "MusicKit manages internally; documented threat model"
-          - id: api-key-protection
-            status: complete
-            notes: "Key never logged or in responses"
-          - id: token-endpoint-rate-limiting
-            status: complete
-            notes: "30 req/min verified effective"
-
-      03-rate-limiter:
-        status: complete
-        max_iterations: 8
-        iterations_used: 4
-        items:
-          - id: current-rate-limiter-analysis
-            status: complete
-            notes: "Analyzed existing implementation"
-          - id: sliding-window-upgrade
-            status: complete
-            notes: "Memory bounds + cleanup implemented"
-          - id: memory-leak-prevention
-            status: complete
-            notes: "Cleanup threshold 1000, hard cap 5000"
-          - id: rate-limit-headers
-            status: complete
-            notes: "4 rate-limit tests added"
-          - id: client-side-rate-limit-handling
-            status: complete
-            notes: "Client handles 429 with Retry-After"
-
-      04-error-message-audit:
-        status: complete
-        max_iterations: 8
-        iterations_used: 5
-        items:
-          - id: server-side-error-messages
-            status: complete
-            notes: "console.warn sanitized"
-          - id: client-side-error-exposure
-            status: complete
-            notes: "No sensitive data in error messages"
-          - id: stack-trace-prevention
-            status: complete
-            notes: "Stack traces not exposed"
-          - id: logging-audit
-            status: complete
-            notes: "Cache-Control headers added"
-          - id: error-code-consistency
-            status: complete
-            notes: "Error codes consistent across routes"
-
-      05-csp-headers:
-        status: complete
-        max_iterations: 6
-        iterations_used: 1
-        items:
-          - id: csp-middleware
-            status: complete
-            notes: "Created apps/web/middleware.ts with CSP, X-Content-Type-Options, X-Frame-Options, Referrer-Policy. Dev mode includes unsafe-eval for Next.js HMR."
-          - id: csp-musickit-cdn
-            status: complete
-            notes: "Included in middleware: script-src has https://js-cdn.music.apple.com"
-          - id: csp-api-connect
-            status: complete
-            notes: "Included in middleware: connect-src has https://api.music.apple.com https://*.apple.com"
-
-  # ──────────────────────────────────────────────
-  # Phase 5: Testing & Reliability (was Phase 4)
-  # ──────────────────────────────────────────────
-  05-testing:
-    status: complete
-    read_only: false
-    branch: ralph/04-testing
-    ci_verified: true
-    started: "2026-03-22T00:00:00Z"
-    completed: "2026-03-22T07:45:00Z"
-    sub_phases:
-      01-unit-tests:
-        status: complete
-        max_iterations: 12
-        iterations_used: 8
-        items:
-          - id: core-parse-id-tests
-            status: complete
-            notes: "Direct tests for parseSetlistIdFromInput"
-          - id: core-apple-tests
-            status: complete
-          - id: core-search-query-coverage
-            status: complete
-          - id: web-cors-tests
-            status: complete
-            notes: "getAllowOrigin edge cases tested"
-          - id: web-fetch-tests
-            status: complete
-            notes: "fetchJson with error, oversized, non-JSON"
-          - id: web-api-tests
-            status: complete
-            notes: "apiUrl construction tested"
-          - id: musickit-token-tests
-            status: complete
-            notes: "fetchDeveloperToken cached/expired/failure/concurrent"
-          - id: musickit-catalog-tests
-            status: complete
-            notes: "searchCatalog cache hit/miss/error/eviction"
-          - id: musickit-playlist-tests
-            status: complete
-            notes: "createLibraryPlaylist and addTracksToLibraryPlaylist"
-
-      02-integration-tests:
-        status: complete
-        max_iterations: 10
-        iterations_used: 6
-        items:
-          - id: test-infrastructure
-            status: complete
-          - id: setlist-proxy-route-tests
-            status: complete
-            notes: "Comprehensive proxy route tests"
-          - id: dev-token-route-tests
-            status: complete
-            notes: "Dev token route tests"
-          - id: health-route-tests
-            status: complete
-            notes: "Health route tests"
-          - id: cors-integration-tests
-            status: complete
-          - id: realistic-fixtures
-            status: complete
-
-      03-component-hook-tests:
-        status: complete
-        max_iterations: 10
-        iterations_used: 2
-        items:
-          - id: musickit-client-tests
-            status: complete
-            notes: "Created musickit-client.test.ts with 5 tests: first call configures, second returns cached, failure resets promise for retry, concurrent calls share promise, missing app ID throws. All pass."
-          - id: matching-view-tests
-            status: blocked
-            notes: "Requires @testing-library/react and jsdom — not installed. Install with: pnpm add -D @testing-library/react jsdom"
-          - id: create-playlist-view-tests
-            status: blocked
-            notes: "Requires @testing-library/react and jsdom"
-          - id: setlist-import-view-tests
-            status: blocked
-            notes: "Requires @testing-library/react and jsdom"
-          - id: use-matching-suggestions-tests
-            status: blocked
-            notes: "Requires @testing-library/react (renderHook) and jsdom"
-          - id: use-flow-state-tests
-            status: blocked
-            notes: "Requires @testing-library/react (renderHook) and jsdom"
-
-      04-edge-cases:
-        status: complete
-        max_iterations: 10
-        iterations_used: 7
-        items:
-          - id: empty-setlist
-            status: complete
-            notes: "46 edge case tests added"
-          - id: huge-setlist
-            status: complete
-          - id: unicode-special-chars
-            status: complete
-            notes: "12 unicode tests added"
-          - id: network-failure-scenarios
-            status: complete
-          - id: concurrent-request-handling
-            status: complete
-          - id: storage-edge-cases
-            status: complete
-          - id: rate-limiter-edge-cases
-            status: complete
-
-      05-e2e-playwright:
-        status: complete
-        max_iterations: 10
-        iterations_used: 0
-        items:
-          - id: playwright-install-config
-            status: blocked
-            notes: "Requires installing @playwright/test — significant dependency. Install with: pnpm add -D @playwright/test && npx playwright install"
-          - id: e2e-test-script
-            status: blocked
-            notes: "Depends on playwright-install-config"
-          - id: smoke-test-app-loads
-            status: blocked
-            notes: "Depends on playwright-install-config"
-          - id: smoke-test-demo
-            status: blocked
-            notes: "Depends on playwright-install-config"
-          - id: import-flow-test
-            status: blocked
-            notes: "Depends on playwright-install-config"
-          - id: error-handling-e2e
-            status: blocked
-            notes: "Depends on playwright-install-config"
-
-  # ──────────────────────────────────────────────
-  # Phase 6: UX, Accessibility & Performance (was Phase 5)
-  # ──────────────────────────────────────────────
-  06-ux-a11y-perf:
-    status: complete
-    read_only: false
-    branch: ralph/05-ux-a11y-perf
-    ci_verified: true
-    started: "2026-03-22T00:00:00Z"
-    completed: "2026-03-22T07:50:00Z"
-    sub_phases:
-      01-wcag-audit:
-        status: complete
-        max_iterations: 10
-        iterations_used: 7
-        items:
-          - id: color-contrast
-            status: complete
-            notes: "Contrast fixes applied"
-          - id: keyboard-navigation
-            status: complete
-            notes: "Keyboard nav verified"
-          - id: aria-landmarks-roles
-            status: complete
-            notes: "ARIA landmarks added"
-          - id: form-accessibility
-            status: complete
-            notes: "Form labels and descriptions"
-          - id: focus-management
-            status: complete
-            notes: "Focus management improved"
-          - id: motion-animation
-            status: complete
-            notes: "Reduced motion support"
-          - id: text-alternatives
-            status: complete
-            notes: "Alt text and aria-labels"
-
-      02-performance:
-        status: complete
-        max_iterations: 8
-        iterations_used: 5
-        items:
-          - id: bundle-analysis
-            status: complete
-          - id: dynamic-imports
-            status: complete
-            notes: "Dynamic imports added"
-          - id: image-optimization
-            status: complete
-          - id: memoization
-            status: complete
-            notes: "React.memo and useMemo applied"
-          - id: network-optimization
-            status: complete
-
-      03-pwa-audit:
-        status: complete
-        max_iterations: 8
-        iterations_used: 1
-        items:
-          - id: web-app-manifest
-            status: complete
-            notes: "manifest.webmanifest exists with name, short_name, start_url, display:standalone, background_color, theme_color, icons (192x192 + 512x512). Linked in layout.tsx metadata."
-          - id: service-worker
-            status: skipped
-            notes: "No service worker installed. Would need @serwist/next or next-pwa package. Deferred — app works fine without offline support."
-          - id: installability
-            status: complete
-            notes: "Meets Chrome installability: valid manifest with required fields and icons. No service worker but Chrome allows install without one."
-          - id: offline-behavior
-            status: complete
-            notes: "Without service worker: initial load requires network, no offline fallback. Loaded setlist data is in React state (lost on refresh). This is acceptable for the current app scope."
-          - id: meta-tags
-            status: complete
-            notes: "layout.tsx has: theme-color meta tag, manifest link, referrer policy. Apple-specific PWA meta tags (apple-mobile-web-app-capable, apple-touch-icon) are nice-to-have but not critical."
-
-      04-responsive:
-        status: complete
-        max_iterations: 6
-        iterations_used: 1
-        items:
-          - id: css-breakpoint-analysis
-            status: complete
-            notes: "Single breakpoint at 480px for mobile. Covers padding, input width, matching row layout (column), search input, demo grids. Consistent approach. Reduced-motion media query at line 395."
-          - id: component-responsive-review
-            status: complete
-            notes: "Components use max-width: 640px on main container (styles.ts mainContainerStyle). Matching rows use flexbox with column layout on mobile. Import form input stretches to 100% on mobile."
-          - id: typography-scaling
-            status: complete
-            notes: "Uses rem units throughout. Body font-size: 16px. No fixed px font sizes. Typography scales naturally with browser zoom."
-          - id: touch-target-sizes
-            status: complete
-            notes: "Buttons use min-height: 46px (LoadingButton style). Input height 46px. History item buttons are inline but have padding. Premium-button has adequate padding."
-          - id: container-width
-            status: complete
-            notes: "Main container max-width: 640px with auto margins. Glass panels have padding. No horizontal overflow detected in CSS. Input max-width: 100% on mobile."
-
-  # ──────────────────────────────────────────────
-  # Phase 7: Documentation & DevEx (was Phase 6)
-  # ──────────────────────────────────────────────
-  07-docs-devex:
-    status: complete
-    read_only: false
-    branch: ralph/06-docs-devex
-    ci_verified: true
-    started: "2026-03-22T00:00:00Z"
-    completed: "2026-03-22T00:00:00Z"
-    sub_phases:
-      01-api-docs:
-        status: complete
-        max_iterations: 8
-        iterations_used: 4
-        items:
-          - id: route-documentation
-            status: complete
-            notes: "docs/tech/api-reference.md created with curl examples"
-          - id: error-response-documentation
-            status: complete
-          - id: authentication-documentation
-            status: complete
-          - id: docs-tech-completeness
-            status: complete
-
-      02-contributing:
-        status: complete
+      01-install-deps:
+        status: not-started
         max_iterations: 4
-        iterations_used: 3
+        iterations_used: 0
         items:
-          - id: contributing-md-accuracy
-            status: complete
-            notes: "Test conventions, pre-push checklist added"
-          - id: agents-md-update
-            status: complete
-            notes: "AGENTS.md updated"
-          - id: first-contribution-path
-            status: complete
-
-      03-architecture:
-        status: complete
-        max_iterations: 6
-        iterations_used: 4
-        items:
-          - id: architecture-md
-            status: complete
-            notes: "ARCHITECTURE.md updated"
-          - id: package-dependency-diagram
-            status: complete
-          - id: feature-directory-map
-            status: complete
-          - id: data-flow-diagram
-            status: complete
-
-      04-onboarding:
-        status: complete
-        max_iterations: 6
-        iterations_used: 4
-        items:
-          - id: clone-to-running-verification
-            status: complete
-          - id: error-messages-missing-config
-            status: complete
-            notes: "Actionable error messages added"
-          - id: readme-quickstart
-            status: complete
-            notes: "README quickstart improved"
-          - id: development-workflow
-            status: complete
+          - id: install-testing-library
+            status: not-started
+            description: "Install @testing-library/react @testing-library/jest-dom jsdom as devDependencies in apps/web"
+          - id: configure-vitest-jsdom
+            status: not-started
+            description: "Update apps/web/vitest.config.ts to support jsdom environment via per-file directive"
+          - id: verify-setup
+            status: not-started
+            description: "Create a minimal render test to verify @testing-library/react works with vitest"
 
   # ──────────────────────────────────────────────
-  # Phase 8: Final Integration & Ship Review (was Phase 7)
+  # R2 Phase 2: Component & Hook Tests (unblocked)
   # ──────────────────────────────────────────────
-  08-ship-review:
-    status: complete
+  r2-02-component-tests:
+    status: not-started
     read_only: false
-    branch: ralph/07-final-review
-    ci_verified: true
-    started: "2026-03-22T00:00:00Z"
-    completed: "2026-03-22T08:00:00Z"
+    branch: ralph/r2-component-tests
+    ci_verified: false
+    started: null
+    completed: null
     sub_phases:
-      01-cross-phase-consistency:
-        status: complete
+      01-hook-tests:
+        status: not-started
         max_iterations: 8
-        iterations_used: 5
+        iterations_used: 0
         items:
-          - id: refactoring-testing-consistency
-            status: complete
-          - id: security-docs-consistency
-            status: complete
-          - id: perf-a11y-consistency
-            status: complete
-          - id: code-style-consistency
-            status: complete
-          - id: import-export-consistency
-            status: complete
+          - id: use-flow-state-tests
+            status: not-started
+            description: "Test useFlowState: initial state, forward/back transitions, matchRows storage"
+          - id: use-matching-suggestions-tests
+            status: not-started
+            description: "Test useMatchingSuggestions: autoMatchAll batching, setMatch, skipUnmatched, resetMatches, stale-run detection"
 
-      02-regression-testing:
-        status: complete
+      02-view-tests:
+        status: not-started
+        max_iterations: 10
+        iterations_used: 0
+        items:
+          - id: setlist-import-view-tests
+            status: not-started
+            description: "Test SetlistImportView: render, submit, preview after load, error display, loading state"
+          - id: matching-view-tests
+            status: not-started
+            description: "Test MatchingView: render tracks, no-matches state, proceed button, bulk actions"
+          - id: create-playlist-view-tests
+            status: not-started
+            description: "Test CreatePlaylistView: render, auth gate, create handler, error state, success state"
+
+      03-middleware-tests:
+        status: not-started
+        max_iterations: 4
+        iterations_used: 0
+        items:
+          - id: csp-middleware-tests
+            status: not-started
+            description: "Test middleware.ts: CSP header present, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, MusicKit CDN in script-src, Apple API in connect-src"
+
+  # ──────────────────────────────────────────────
+  # R2 Phase 3: Accessibility & Code Quality Fixes
+  # ──────────────────────────────────────────────
+  r2-03-quality-fixes:
+    status: not-started
+    read_only: false
+    branch: ralph/r2-quality-fixes
+    ci_verified: false
+    started: null
+    completed: null
+    sub_phases:
+      01-accessibility:
+        status: not-started
         max_iterations: 6
-        iterations_used: 3
+        iterations_used: 0
+        items:
+          - id: search-result-aria-labels
+            status: not-started
+            description: "Add aria-label to search result buttons in TrackSearchPanel.tsx describing track name and artist"
+          - id: loading-fallback-consistency
+            status: not-started
+            description: "Replace plain <p> tags in dynamic import loading fallbacks with StatusText component for consistency"
+          - id: console-error-env-gate
+            status: not-started
+            description: "Gate console.error in error.tsx with process.env.NODE_ENV check"
+
+      02-code-patterns:
+        status: not-started
+        max_iterations: 6
+        iterations_used: 0
+        items:
+          - id: async-action-cleanup
+            status: not-started
+            description: "Remove redundant .then((value) => value) in useAsyncAction.ts"
+          - id: search-ref-pattern
+            status: not-started
+            description: "Fix useTrackSearch.ts searchQueryRef update — move from component body to useEffect for correctness"
+          - id: musickit-timeout-guard
+            status: not-started
+            description: "Add cleared flag to waitForMusicKit in client.ts to prevent resolve/reject race on timeout"
+          - id: missing-barrel-exports
+            status: not-started
+            description: "Export FlowStepIndicator from components/index.ts; export missing type props from feature indexes"
+
+  # ──────────────────────────────────────────────
+  # R2 Phase 4: Final Verification
+  # ──────────────────────────────────────────────
+  r2-04-verification:
+    status: not-started
+    read_only: false
+    branch: ralph/r2-verification
+    ci_verified: false
+    started: null
+    completed: null
+    sub_phases:
+      01-regression:
+        status: not-started
+        max_iterations: 4
+        iterations_used: 0
         items:
           - id: full-ci-suite
-            status: complete
-            notes: "197 tests pass"
+            status: not-started
+            description: "Run full CI: format, lint, build, test, audit"
           - id: test-stability
-            status: complete
-            notes: "3/3 consecutive runs pass, zero flaky"
-          - id: build-output-check
-            status: complete
-          - id: e2e-regression
-            status: skipped
-            notes: "E2E not yet set up"
-
-      03-ship-review:
-        status: complete
-        max_iterations: 12
-        iterations_used: 8
-        items:
-          - id: review-core-src
-            status: complete
-          - id: review-shared-src
-            status: complete
-          - id: review-api-src
-            status: complete
-          - id: review-web-lib
-            status: complete
-          - id: review-web-components
-            status: complete
-          - id: review-web-features
-            status: complete
-            notes: "2 dead files deleted, DCI prefixes cleaned from 14 files"
-          - id: review-web-app
-            status: complete
-          - id: review-config-files
-            status: complete
-
-      04-version-changelog:
-        status: complete
-        max_iterations: 4
-        iterations_used: 2
-        items:
-          - id: determine-version-bump
-            status: complete
-            notes: "Minor bump 0.1.0 → 0.2.0: bug fixes, security (CSP), new tests, analysis. No breaking changes."
+            status: not-started
+            description: "Run test suite 3 times to verify zero flaky tests"
           - id: update-changelog
-            status: complete
-            notes: "Added [0.2.0] section with Fixed, Security, Testing, Analysis categories."
-          - id: update-package-json-version
-            status: complete
-            notes: "Bumped 0.1.0 → 0.2.0 in apps/web, apps/api, packages/core, packages/shared"
-          - id: final-verification
-            status: complete
-            notes: "Full CI green: format, lint, build, 202 tests (24 files), audit clean."
+            status: not-started
+            description: "Update CHANGELOG.md with round 2 changes"
