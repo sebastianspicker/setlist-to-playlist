@@ -8,10 +8,10 @@ baseline:
   ci_status: green
 
 current:
-  test_count: 214
+  test_count: 219
   phase: "r2-02-component-tests"
   sub_phase: "02-view-tests"
-  item: "setlist-import-view-tests"
+  item: "matching-view-tests"
 
 phases:
   # ──────────────────────────────────────────────
@@ -64,13 +64,13 @@ phases:
             notes: "6 tests: initial state, initial matches from entries, autoMatchAll calls searchCatalog, setMatch updates row, skipUnmatched marks skipped, resetMatches clears. All pass."
 
       02-view-tests:
-        status: not-started
+        status: in-progress
         max_iterations: 10
-        iterations_used: 0
+        iterations_used: 1
         items:
           - id: setlist-import-view-tests
-            status: not-started
-            description: "Test SetlistImportView: render, submit, preview after load, error display, loading state"
+            status: complete
+            notes: "5 tests with mocked hooks + sub-components: renders input/button, disabled when empty, loading state, error display, history items. All pass."
           - id: matching-view-tests
             status: not-started
             description: "Test MatchingView: render tracks, no-matches state, proceed button, bulk actions"
