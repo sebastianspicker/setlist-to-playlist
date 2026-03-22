@@ -7,10 +7,10 @@ baseline:
   ci_status: green
 
 current:
-  test_count: 197
+  test_count: 202
   phase: "05-testing"
   sub_phase: "03-component-hook-tests"
-  item: "musickit-client-tests"
+  item: "matching-view-tests"
 
 phases:
   # ──────────────────────────────────────────────
@@ -451,13 +451,13 @@ phases:
             status: complete
 
       03-component-hook-tests:
-        status: not-started
+        status: in-progress
         max_iterations: 10
-        iterations_used: 0
+        iterations_used: 1
         items:
           - id: musickit-client-tests
-            status: not-started
-            description: "Test initMusicKit (init, cache, failure reset, concurrent dedup)"
+            status: complete
+            notes: "Created musickit-client.test.ts with 5 tests: first call configures, second returns cached, failure resets promise for retry, concurrent calls share promise, missing app ID throws. All pass."
           - id: matching-view-tests
             status: not-started
             description: "Test MatchingView (render, no-matches, search, bulk actions)"
