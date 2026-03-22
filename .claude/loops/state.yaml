@@ -9,26 +9,26 @@ baseline:
 
 current:
   test_count: 202
-  phase: "r2-01-test-infra"
-  sub_phase: "01-install-deps"
-  item: "verify-setup"
+  phase: "r2-02-component-tests"
+  sub_phase: "01-hook-tests"
+  item: "use-flow-state-tests"
 
 phases:
   # ──────────────────────────────────────────────
   # R2 Phase 1: Testing Infrastructure
   # ──────────────────────────────────────────────
   r2-01-test-infra:
-    status: in-progress
+    status: complete
     read_only: false
     branch: ralph/02-refactoring
-    ci_verified: false
+    ci_verified: true
     started: "2026-03-22T09:00:00Z"
-    completed: null
+    completed: "2026-03-22T09:10:00Z"
     sub_phases:
       01-install-deps:
-        status: in-progress
+        status: complete
         max_iterations: 4
-        iterations_used: 2
+        iterations_used: 3
         items:
           - id: install-testing-library
             status: complete
@@ -37,8 +37,8 @@ phases:
             status: complete
             notes: "Created tests/setup.ts with @testing-library/jest-dom/vitest import. Updated vitest.config.ts with setupFiles. Per-file jsdom via // @vitest-environment jsdom directive."
           - id: verify-setup
-            status: not-started
-            description: "Create a minimal render test to verify @testing-library/react works with vitest"
+            status: complete
+            notes: "Created smoke.test.tsx with jsdom env + RTL render + toBeInTheDocument. Passes."
 
   # ──────────────────────────────────────────────
   # R2 Phase 2: Component & Hook Tests (unblocked)
