@@ -13,15 +13,20 @@ function waitForMusicKit(): Promise<MusicKitGlobal> {
       resolve(window.MusicKit);
       return;
     }
+    let settled = false;
     const check = setInterval(() => {
-      if (window.MusicKit) {
+      if (!settled && window.MusicKit) {
+        settled = true;
         clearInterval(check);
         resolve(window.MusicKit);
       }
     }, 50);
     setTimeout(() => {
-      clearInterval(check);
-      reject(new Error('MusicKit script did not load'));
+      if (!settled) {
+        settled = true;
+        clearInterval(check);
+        reject(new Error('MusicKit script did not load'));
+      }
     }, 10000);
   });
 }
@@ -31,7 +36,7 @@ let initPromise: Promise<MusicKitInstance> | null = null;
 
 /**
  * Configure MusicKit with Developer Token and app ID.
- * DCI-107: Promise-based singleton to prevent concurrent init races.
+ * Promise-based singleton to prevent concurrent init races.
  */
 export async function initMusicKit(): Promise<MusicKitInstance> {
   if (configuredInstance) return configuredInstance;
@@ -75,7 +80,10 @@ export async function isMusicKitAuthorized(): Promise<boolean> {
     const music = await initMusicKit();
     return music.isAuthorized === true;
   } catch (err) {
-    console.warn('MusicKit authorization check failed during initialization:', err);
+    console.warn(
+      'MusicKit authorization check failed during initialization:',
+      err instanceof Error ? err.message : 'Unknown error'
+    );
     return false;
   }
 }

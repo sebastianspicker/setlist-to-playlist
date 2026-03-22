@@ -21,7 +21,6 @@ export function useAsyncAction(): UseAsyncActionReturn {
     setError(null);
     setLoading(true);
     return fn()
-      .then((value) => value)
       .catch((err) => {
         const message = err instanceof Error ? err.message : String(err);
         setError(message);
