@@ -9,7 +9,10 @@ vi.mock('../../src/components/SectionTitle', () => ({
     React.createElement('h2', null, children),
 }));
 vi.mock('../../src/components/StatusText', () => ({
-  StatusText: ({ children, ...p }: React.HTMLAttributes<HTMLElement> & { children: React.ReactNode }) =>
+  StatusText: ({
+    children,
+    ...p
+  }: React.HTMLAttributes<HTMLElement> & { children: React.ReactNode }) =>
     React.createElement('p', p, children),
 }));
 vi.mock('../../src/components/LoadingButton', () => ({
@@ -47,7 +50,11 @@ describe('MatchingView', () => {
   beforeEach(() => {
     mockUseMatchingSuggestions.mockReturnValue({
       matches: [
-        { setlistEntry: { name: 'Song A', artist: 'Test Artist' }, appleTrack: null, status: 'unmatched' },
+        {
+          setlistEntry: { name: 'Song A', artist: 'Test Artist' },
+          appleTrack: null,
+          status: 'unmatched',
+        },
       ],
       loadingSuggestions: false,
       suggestionError: false,
@@ -57,7 +64,13 @@ describe('MatchingView', () => {
       skipUnmatched: vi.fn(),
     });
     mockUseTrackSearch.mockReturnValue({
-      searchContext: { searchingIndex: null, searchQuery: '', searchResults: [], searching: false, searchError: false },
+      searchContext: {
+        searchingIndex: null,
+        searchQuery: '',
+        searchResults: [],
+        searching: false,
+        searchError: false,
+      },
       setSearchQuery: vi.fn(),
       openSearch: vi.fn(),
       runSearch: vi.fn(),
@@ -91,5 +104,4 @@ describe('MatchingView', () => {
     const proceedBtn = buttons.find((b) => b.textContent?.includes('Create playlist'));
     expect(proceedBtn).toBeDisabled();
   });
-
 });

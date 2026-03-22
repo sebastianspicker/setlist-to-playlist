@@ -11,7 +11,7 @@ export async function signDeveloperToken(params: {
   privateKeyPem: string;
 }): Promise<string> {
   const { teamId, keyId, privateKeyPem } = params;
-  // DCI-011: normalize all newline variants (literal \n, CRLF, CR) to \n
+  // Normalize all newline variants (literal \n, CRLF, CR) to \n
   const normalizedPem = privateKeyPem
     .replace(/\\n/g, '\n')
     .replace(/\r\n/g, '\n')

@@ -1,16 +1,20 @@
 import type { Result } from '@repo/shared';
 
-/** DCI-004: Max response size to avoid DoS from huge JSON (10 MiB). */
+/** Max response size to avoid DoS from huge JSON (10 MiB). */
 const MAX_JSON_RESPONSE_BYTES = 10 * 1024 * 1024;
 
-function extractError(data: unknown, fallback: string): string {
-  if (
-    data &&
+function hasErrorString(data: unknown): data is { error: string } {
+  return (
     typeof data === 'object' &&
+    data !== null &&
     'error' in data &&
-    typeof (data as { error: unknown }).error === 'string'
-  ) {
-    return (data as { error: string }).error;
+    typeof (data as Record<string, unknown>).error === 'string'
+  );
+}
+
+function extractError(data: unknown, fallback: string): string {
+  if (hasErrorString(data)) {
+    return data.error;
   }
   return fallback;
 }

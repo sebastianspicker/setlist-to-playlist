@@ -15,5 +15,5 @@ export function internalError(
   message = 'An unexpected error occurred. Please try again.'
 ): NextResponse {
   const payload: ApiErrorPayload = { error: message, code: API_ERROR.INTERNAL };
-  return jsonResponse(payload, 500, request);
+  return jsonResponse(payload, 500, request, { 'Cache-Control': 'no-store' });
 }

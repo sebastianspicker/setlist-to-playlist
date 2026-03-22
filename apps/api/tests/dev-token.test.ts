@@ -27,7 +27,11 @@ describe('dev-token', () => {
     delete process.env.APPLE_PRIVATE_KEY;
 
     const result = await handleDevToken();
-    expect(result).toEqual({ error: 'Missing Apple credentials in environment.' });
+    expect(result).toHaveProperty('error');
+    expect((result as { error: string }).error).toMatch(/Missing env var\(s\):/);
+    expect((result as { error: string }).error).toContain('APPLE_TEAM_ID');
+    expect((result as { error: string }).error).toContain('APPLE_KEY_ID');
+    expect((result as { error: string }).error).toContain('APPLE_PRIVATE_KEY');
   });
 
   it('returns a JWT when credentials are set', async () => {

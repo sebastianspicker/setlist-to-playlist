@@ -52,28 +52,45 @@ export function useMatchingSuggestions(setlist: Setlist): UseMatchingSuggestions
         status: 'unmatched',
       }))
     );
-    for (let i = 0; i < entriesFlat.length; i++) {
+    const BATCH_SIZE = 5;
+    for (let batchStart = 0; batchStart < entriesFlat.length; batchStart += BATCH_SIZE) {
       if (runIdRef.current !== localRunId) return;
-      const entry = entriesFlat[i];
-      const query = buildSearchQuery(entry.name, entry.artist);
-      if (!query) continue;
-      try {
-        const tracks = await searchCatalog(query, 1);
-        if (runIdRef.current !== localRunId) return;
-        const track = tracks[0] ?? null;
-        setMatches((prev) => {
-          const next = [...prev];
-          if (next[i]) {
-            next[i] = {
-              ...next[i],
-              appleTrack: track,
-              status: track ? 'matched' : 'unmatched',
-            };
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, entriesFlat.length);
+      const batchIndices = Array.from({ length: batchEnd - batchStart }, (_, k) => batchStart + k);
+
+      const results = await Promise.allSettled(
+        batchIndices.map((i) => {
+          const entry = entriesFlat[i]!;
+          const query = buildSearchQuery(entry.name, entry.artist);
+          if (!query) return Promise.resolve(null);
+          return searchCatalog(query, 1).then((tracks) => tracks[0] ?? null);
+        })
+      );
+
+      if (runIdRef.current !== localRunId) return;
+
+      setMatches((prev) => {
+        const next = [...prev];
+        for (let k = 0; k < batchIndices.length; k++) {
+          const i = batchIndices[k]!;
+          const result = results[k];
+          if (result?.status === 'fulfilled') {
+            const track = result.value;
+            const existing = next[i];
+            if (existing) {
+              next[i] = {
+                ...existing,
+                appleTrack: track,
+                status: track ? 'matched' : 'unmatched',
+              };
+            }
           }
-          return next;
-        });
-      } catch {
-        if (runIdRef.current !== localRunId) return;
+        }
+        return next;
+      });
+
+      const hasRejection = results.some((r) => r.status === 'rejected');
+      if (hasRejection) {
         setSuggestionError(true);
       }
     }
@@ -86,10 +103,11 @@ export function useMatchingSuggestions(setlist: Setlist): UseMatchingSuggestions
 
   const setMatch = useCallback((index: number, appleTrack: AppleMusicTrack | null) => {
     setMatches((prev) => {
-      if (index < 0 || index >= prev.length) return prev;
+      const existing = prev[index];
+      if (!existing) return prev;
       const next = [...prev];
       next[index] = {
-        ...next[index],
+        ...existing,
         appleTrack,
         status: appleTrack ? 'matched' : 'skipped',
       };

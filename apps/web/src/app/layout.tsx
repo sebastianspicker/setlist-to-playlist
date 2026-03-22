@@ -23,10 +23,10 @@ export default function RootLayout({
         <a href="#main" className="skip-link">
           Skip to main content
         </a>
-        {/* DCI-020: crossOrigin for future SRI; SRI not added—Apple does not publish a stable integrity hash. */}
+        {/* crossOrigin for future SRI; SRI not added because Apple does not publish a stable integrity hash. */}
         <Script
           src="https://js-cdn.music.apple.com/musickit/v3/musickit.js"
-          strategy="beforeInteractive"
+          strategy="afterInteractive"
           crossOrigin="anonymous"
         />
         {children}

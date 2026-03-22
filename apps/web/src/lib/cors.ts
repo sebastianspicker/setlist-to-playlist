@@ -1,10 +1,10 @@
 import type { NextRequest } from 'next/server';
 
 /**
- * Shared CORS helper for API routes (DCI-044).
- * Set ALLOWED_ORIGIN in production; when unset, only localhost/127.0.0.1 are allowed (DCI-001). DCI-037: trim and use single origin.
- * DCI-062: Strip trailing slash from configured origin so it matches browser Origin (no path).
- * DCI-002: Reject "*" to avoid allowing any origin (insecure).
+ * Shared CORS helper for API routes.
+ * Set ALLOWED_ORIGIN in production; when unset, only localhost/127.0.0.1 are allowed.
+ * Trims and uses a single origin; strips trailing slash so it matches the browser Origin header.
+ * Rejects "*" to avoid allowing any origin (insecure).
  */
 export function getAllowOrigin(origin: string | null): string | null {
   const configured = (process.env.ALLOWED_ORIGIN ?? '').trim();
@@ -13,7 +13,7 @@ export function getAllowOrigin(origin: string | null): string | null {
     origin !== 'null' &&
     (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1'));
   if (configured) {
-    const single = configured.split(',')[0].trim().replace(/\/$/, '');
+    const single = (configured.split(',')[0] ?? '').trim().replace(/\/$/, '');
     if (!single || single === 'null' || single === '*') return null;
     return single;
   }
@@ -31,7 +31,7 @@ export function corsHeaders(request: NextRequest, contentType = 'application/jso
 }
 
 /**
- * CORS headers for OPTIONS (204 No Content). DCI-053: No Content-Type for 204. DCI-054: Include Allow-Methods and Allow-Headers for preflight.
+ * CORS headers for OPTIONS (204 No Content). No Content-Type for 204; includes Allow-Methods and Allow-Headers for preflight.
  */
 export function corsHeadersForOptions(request: NextRequest): HeadersInit {
   const origin = request.headers.get('origin');

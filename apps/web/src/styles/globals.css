@@ -3,10 +3,11 @@
   --text-main: #f8fafc;
   --text-muted: #94a3b8;
   --accent-primary: #3b82f6;
+  --accent-primary-btn: #2563eb;
   --accent-glow: rgba(59, 130, 246, 0.5);
   --glass-bg: rgba(30, 41, 59, 0.7);
   --glass-border: rgba(255, 255, 255, 0.1);
-  --danger: #ef4444;
+  --danger: #f87171;
   --success: #10b981;
 }
 
@@ -74,7 +75,7 @@ body {
   font-size: 1rem;
   font-weight: 500;
   color: #fff;
-  background: var(--accent-primary);
+  background: var(--accent-primary-btn);
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -85,7 +86,7 @@ body {
 .premium-button:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(0, 118, 255, 0.23);
-  background: #2563eb;
+  background: #1d4ed8;
 }
 .premium-button:active:not(:disabled) {
   transform: translateY(0);
@@ -373,6 +374,11 @@ input:focus-visible,
   outline-offset: 2px;
 }
 
+/* Suppress visible focus ring on programmatically-focused step containers */
+[tabindex='-1']:focus:not(:focus-visible) {
+  outline: none;
+}
+
 /* Touch targets: minimum 44px (WCAG 2.5.5) */
 button {
   min-height: 44px;
@@ -393,6 +399,10 @@ a[href] {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .premium-button:hover:not(:disabled) {
+    transform: none !important;
   }
 }
 

@@ -8,7 +8,7 @@ A PWA that imports a setlist from [setlist.fm](https://www.setlist.fm) (by URL o
 ## Prerequisites
 
 - **Node.js** ≥ 20 (see `engines` in root `package.json`)
-- **pnpm** (recommended; the repo uses a pnpm workspace)
+- **pnpm** ≥ 9 (the repo uses a pnpm workspace)
 
 ## Environment
 
@@ -22,6 +22,7 @@ Copy `.env.example` to `.env` in the repo root and set:
 ## Quick Start
 
 ```bash
+cp .env.example .env   # then fill in your API keys (see Environment above)
 pnpm install
 pnpm build
 pnpm dev

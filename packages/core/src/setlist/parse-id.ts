@@ -19,7 +19,7 @@ export function parseSetlistIdFromInput(idOrUrl: string): string | null {
       const path = url.pathname;
 
       const match = path.match(/-([a-f0-9]{4,12})\.html$/i);
-      if (match) return match[1];
+      if (match?.[1]) return match[1];
 
       const segment = path.split('/').filter(Boolean).pop() ?? '';
       const withoutHtml = segment.replace(/\.html$/i, '');

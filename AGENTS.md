@@ -26,6 +26,14 @@ How a coding agent (or human) should work in this repo.
 - **Test:** `pnpm test` from root runs workspace tests (core, api, shared, web). Run before pushing.
 - **Build:** `pnpm build` from root builds all packages.
 
+## Test Infrastructure
+
+~160 tests across 23 test files (Vitest). Patterns used throughout:
+
+- `vi.mock` for module-level mocks, `vi.stubGlobal` for browser globals (e.g. `fetch`, `window.sessionStorage`).
+- Standard `describe` / `it` structure; `beforeEach` / `afterEach` for timer and mock cleanup.
+- Test areas: normalization, search-query building, setlist mapping, dedupe, CORS headers, fetch helpers, API URL construction, MusicKit token/catalog/playlist, rate limiter memory bounds, route handlers (dev-token, setlist-proxy, health).
+
 See [CONTRIBUTING.md](CONTRIBUTING.md) for how to verify your work locally (lint, test, format).
 
 Use this file as the single source of truth for agent and contributor behavior.

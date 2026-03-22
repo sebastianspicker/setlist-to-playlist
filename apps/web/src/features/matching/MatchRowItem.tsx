@@ -1,17 +1,16 @@
 'use client';
 
+import React from 'react';
 import type { AppleMusicTrack } from '@/lib/musickit';
 import type { MatchRow } from './types';
 import { TrackSearchPanel } from './TrackSearchPanel';
+import type { TrackSearchContext } from './useTrackSearch';
 
 export interface MatchRowItemProps {
   row: MatchRow;
   index: number;
-  searchingIndex: number | null;
-  searchQuery: string;
-  searchResults: AppleMusicTrack[];
-  searching: boolean;
-  searchError: boolean;
+  isSearching: boolean;
+  searchContext: TrackSearchContext | null;
   onOpenSearch: (index: number) => void;
   onSkip: (index: number) => void;
   onSearchQueryChange: (value: string) => void;
@@ -19,14 +18,11 @@ export interface MatchRowItemProps {
   onChoose: (index: number, track: AppleMusicTrack) => void;
 }
 
-export function MatchRowItem({
+export const MatchRowItem = React.memo(function MatchRowItem({
   row,
   index,
-  searchingIndex,
-  searchQuery,
-  searchResults,
-  searching,
-  searchError,
+  isSearching,
+  searchContext,
   onOpenSearch,
   onSkip,
   onSearchQueryChange,
@@ -76,13 +72,13 @@ export function MatchRowItem({
         </div>
       </div>
 
-      {searchingIndex === index && (
+      {isSearching && searchContext && (
         <TrackSearchPanel
           index={index}
-          searchQuery={searchQuery}
-          searching={searching}
-          searchError={searchError}
-          searchResults={searchResults}
+          searchQuery={searchContext.searchQuery}
+          searching={searchContext.searching}
+          searchError={searchContext.searchError}
+          searchResults={searchContext.searchResults}
           onSearchQueryChange={onSearchQueryChange}
           onSearch={() => onSearch(index)}
           onChoose={(track) => onChoose(index, track)}
@@ -90,4 +86,4 @@ export function MatchRowItem({
       )}
     </li>
   );
-}
+});

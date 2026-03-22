@@ -3,7 +3,7 @@ import { NextRequest } from 'next/server';
 import { jsonResponse } from '@/lib/api-response';
 import { optionsNoContent } from '../_helpers';
 
-/** DCI-043: OPTIONS for CORS preflight so cross-origin health checks succeed. DCI-053/054: use corsHeadersForOptions (no Content-Type, include Allow-Methods/Headers). */
+/** OPTIONS for CORS preflight so cross-origin health checks succeed. Uses corsHeadersForOptions (no Content-Type, includes Allow-Methods/Headers). */
 export async function OPTIONS(request: NextRequest) {
   return optionsNoContent(request);
 }

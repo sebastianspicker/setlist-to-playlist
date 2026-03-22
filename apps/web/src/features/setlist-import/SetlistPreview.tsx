@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { flattenSetlistToEntries, type Setlist } from '@repo/core';
 import { SectionTitle } from '@/components/SectionTitle';
 
@@ -5,7 +6,7 @@ interface SetlistPreviewProps {
   setlist: Setlist;
 }
 
-export function SetlistPreview({ setlist }: SetlistPreviewProps) {
+export const SetlistPreview = memo(function SetlistPreview({ setlist }: SetlistPreviewProps) {
   const tracks = flattenSetlistToEntries(setlist).map((e) => ({ name: e.name, info: e.info }));
 
   return (
@@ -38,10 +39,12 @@ export function SetlistPreview({ setlist }: SetlistPreviewProps) {
         {tracks.map((t, i) => (
           <li key={i} style={{ marginBottom: '0.25rem' }}>
             {t.name}
-            {t.info ? <span style={{ color: '#666', fontSize: '0.9em' }}> — {t.info}</span> : null}
+            {t.info ? (
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.9em' }}> — {t.info}</span>
+            ) : null}
           </li>
         ))}
       </ol>
     </section>
   );
-}
+});

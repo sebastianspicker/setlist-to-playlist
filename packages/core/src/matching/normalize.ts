@@ -13,7 +13,7 @@ export function normalizeTrackName(name: string): string {
   let s = name.replace(parenthetical, ' ');
   s = s.replace(new RegExp(`\\s*\\(\\s*(?:\\d{4}\\s+)?${METADATA_KEYWORDS}[^)]*$`, 'gi'), ' ');
 
-  // 2. feat. segment before trailing dash: if "feat. X - <metadata>", keep the metadata (DCI-063); otherwise remove entire feat. segment (DCI-008)
+  // 2. feat. segment before trailing dash: if "feat. X - <metadata>", keep the metadata; otherwise remove entire feat. segment
   const featWithMetadata = new RegExp(
     `\\s*(?:feat|ft)\\.?\\s+[^(\\n]*?\\s*-\\s*(${METADATA_KEYWORDS})\\b\\s*`,
     'gi'

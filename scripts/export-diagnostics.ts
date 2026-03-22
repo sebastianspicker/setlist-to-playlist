@@ -24,7 +24,7 @@ function envVarNamesPresent(): string[] {
   return names.sort();
 }
 
-/** Resolve --out path and ensure it is under cwd to avoid path traversal (DCI-009). */
+/** Resolve --out path and ensure it is under cwd to avoid path traversal. */
 function resolveOutPath(raw: string): string | null {
   const cwd = process.cwd();
   const normalized = resolve(cwd, raw);

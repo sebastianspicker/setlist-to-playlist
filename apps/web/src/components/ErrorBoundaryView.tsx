@@ -15,7 +15,7 @@ export function ErrorBoundaryView({
   return (
     <main id="main" style={{ padding: '2rem', maxWidth: '40rem', margin: '0 auto' }}>
       <h1>Something went wrong</h1>
-      <p style={{ color: '#666', marginTop: '0.5rem' }}>
+      <p role="alert" style={{ color: 'var(--text-muted)', marginTop: '0.5rem' }}>
         {message || 'An error occurred. You can try again.'}
       </p>
       <button

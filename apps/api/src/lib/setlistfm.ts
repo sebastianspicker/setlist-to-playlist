@@ -25,7 +25,6 @@ function evictExpired(): void {
 }
 
 function setCached(id: string, body: unknown): void {
-  // DCI-037: Removed expensive JSON.stringify(body).length check.
   // With CACHE_EVICT_THRESHOLD at 200, the risk of OOM from standard setlist JSON is negligible.
 
   cache.set(id, { body, expires: Date.now() + CACHE_TTL_MS });

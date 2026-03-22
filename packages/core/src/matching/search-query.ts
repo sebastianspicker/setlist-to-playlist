@@ -1,6 +1,6 @@
 import { normalizeTrackName } from './normalize.js';
 
-/** DCI-051: Cap length to avoid very long queries hitting API limits. */
+/** Cap length to avoid very long queries hitting API limits. */
 const MAX_QUERY_LENGTH = 200;
 
 /**

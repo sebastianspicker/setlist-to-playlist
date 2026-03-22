@@ -1,140 +1,41 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { buildPlaylistName, dedupeTrackIdsOrdered } from '@repo/core';
-import { getErrorMessage } from '@repo/shared';
+import { useMemo } from 'react';
 import type { MatchRow } from '@/features/matching/types';
-import {
-  isMusicKitAuthorized,
-  createLibraryPlaylist,
-  addTracksToLibraryPlaylist,
-} from '@/lib/musickit';
 import { ErrorAlert } from '@/components/ErrorAlert';
 import { LoadingButton } from '@/components/LoadingButton';
 import { SectionTitle } from '@/components/SectionTitle';
 import { ConnectAppleMusic } from '@/features/matching/ConnectAppleMusic';
 import type { Setlist } from '@repo/core';
+import { useCreatePlaylistState } from './useCreatePlaylistState';
 
 export interface CreatePlaylistViewProps {
   setlist: Setlist;
   matchRows: MatchRow[];
 }
 
-interface ResumeState {
-  id: string;
-  url?: string;
-  remainingIds: string[];
-}
-
-function resumeKey(setlistId: string): string {
-  return `playlist_resume_v1:${setlistId}`;
-}
-
-function readResume(setlistId: string): ResumeState | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = window.sessionStorage.getItem(resumeKey(setlistId));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as ResumeState;
-    if (!parsed?.id || !Array.isArray(parsed?.remainingIds)) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function writeResume(setlistId: string, value: ResumeState | null): void {
-  if (typeof window === 'undefined') return;
-  const key = resumeKey(setlistId);
-  if (!value) {
-    window.sessionStorage.removeItem(key);
-    return;
-  }
-  window.sessionStorage.setItem(key, JSON.stringify(value));
-}
-
 export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewProps) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [created, setCreated] = useState<{ id: string; url?: string } | null>(null);
-  const [needsAuth, setNeedsAuth] = useState(false);
-  const [addTracksError, setAddTracksError] = useState<string | null>(null);
-  const [dedupeTracks, setDedupeTracks] = useState(false);
-  const [resumeState, setResumeState] = useState<ResumeState | null>(null);
+  const {
+    loading,
+    error,
+    addTracksError,
+    needsAuth,
+    created,
+    resumeState,
+    dedupeTracks,
+    setDedupeTracks,
+    selectedSongIds,
+    songIds,
+    handleCreate,
+    handleAddRemainingTracks,
+    handleAuthorized,
+  } = useCreatePlaylistState({ setlist, matchRows });
 
-  useEffect(() => {
-    setResumeState(readResume(setlist.id));
-  }, [setlist.id]);
-
-  const selectedSongIds = useMemo(
-    () => matchRows.map((r) => r.appleTrack?.id).filter(Boolean) as string[],
-    [matchRows]
+  const count = useMemo(() => matchRows.filter((m) => m.appleTrack !== null).length, [matchRows]);
+  const dedupeSavings = useMemo(
+    () => selectedSongIds.length - songIds.length,
+    [selectedSongIds, songIds]
   );
-
-  const songIds = useMemo(
-    () => (dedupeTracks ? dedupeTrackIdsOrdered(selectedSongIds) : selectedSongIds),
-    [dedupeTracks, selectedSongIds]
-  );
-
-  async function handleCreate() {
-    setError(null);
-    setAddTracksError(null);
-    setNeedsAuth(false);
-    setLoading(true);
-    try {
-      const authorized = await isMusicKitAuthorized();
-      if (!authorized) {
-        setNeedsAuth(true);
-        return;
-      }
-
-      if (songIds.length === 0) {
-        setError('No tracks to add. Match at least one track first.');
-        return;
-      }
-
-      const name = buildPlaylistName(setlist);
-      const { id, url } = await createLibraryPlaylist(name);
-      setCreated({ id, url });
-
-      try {
-        await addTracksToLibraryPlaylist(id, songIds);
-        setResumeState(null);
-        writeResume(setlist.id, null);
-      } catch (addErr) {
-        const resume: ResumeState = { id, url, remainingIds: [...songIds] };
-        setResumeState(resume);
-        writeResume(setlist.id, resume);
-        setAddTracksError(getErrorMessage(addErr, 'Adding tracks failed.'));
-      }
-    } catch (err) {
-      setError(getErrorMessage(err, 'Failed to create playlist.'));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleAddRemainingTracks() {
-    const target = resumeState ?? (created ? { ...created, remainingIds: [...songIds] } : null);
-    if (!target || target.remainingIds.length === 0) return;
-    setAddTracksError(null);
-    setLoading(true);
-    try {
-      await addTracksToLibraryPlaylist(target.id, target.remainingIds);
-      setResumeState(null);
-      writeResume(setlist.id, null);
-      setAddTracksError(null);
-    } catch (err) {
-      setAddTracksError(getErrorMessage(err, 'Adding tracks failed.'));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleAuthorized() {
-    setNeedsAuth(false);
-    await handleCreate();
-  }
 
   if (created || resumeState) {
     const current = resumeState ?? created;
@@ -145,7 +46,7 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
         <p className="success-title">Playlist created.</p>
         {addTracksError ? (
           <>
-            <p className="error-text" style={{ marginTop: '0.5rem' }}>
+            <p role="alert" className="error-text" style={{ marginTop: '0.5rem' }}>
               Playlist was created but adding tracks failed: {addTracksError}
             </p>
             <LoadingButton
@@ -181,9 +82,6 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
       </div>
     );
   }
-
-  const count = matchRows.filter((m) => m.appleTrack !== null).length;
-  const dedupeSavings = selectedSongIds.length - songIds.length;
 
   return (
     <section aria-label="Create playlist" className="glass-panel" style={{ marginTop: '2rem' }}>
@@ -233,7 +131,6 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
         <ErrorAlert
           message={error}
           onRetry={() => {
-            setError(null);
             void handleCreate();
           }}
           retryLabel="Retry create playlist"

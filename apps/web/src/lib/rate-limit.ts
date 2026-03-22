@@ -8,15 +8,51 @@ export interface InMemoryRateLimiter {
   take: (key: string) => RateLimitResult;
 }
 
+/** Threshold at which expired-bucket cleanup runs. */
+const CLEANUP_THRESHOLD = 1000;
+
+/** Hard cap — if still above this after expiry sweep, drop oldest entries (FIFO). */
+const MAX_BUCKETS = 5000;
+
 /**
  * Small in-memory fixed-window rate limiter.
  * Works per-instance and is intended as a lightweight abuse guard.
+ *
+ * Includes automatic memory-leak prevention:
+ * - When the bucket count exceeds {@link CLEANUP_THRESHOLD}, expired entries are swept.
+ * - If the count still exceeds {@link MAX_BUCKETS}, the oldest entries (by insertion
+ *   order) are removed until the map is back at the limit.
  */
 export function createInMemoryRateLimiter(
   maxRequests: number,
-  windowMs: number
+  windowMs: number,
+  {
+    cleanupThreshold = CLEANUP_THRESHOLD,
+    maxBuckets = MAX_BUCKETS,
+  }: { cleanupThreshold?: number; maxBuckets?: number } = {}
 ): InMemoryRateLimiter {
   const buckets = new Map<string, { count: number; resetAt: number }>();
+
+  /** Remove expired buckets and, if still over the hard cap, evict oldest entries. */
+  function cleanup(now: number): void {
+    // Phase 1: sweep expired entries
+    for (const [k, v] of buckets) {
+      if (now >= v.resetAt) {
+        buckets.delete(k);
+      }
+    }
+
+    // Phase 2: if still over the hard cap, delete oldest (FIFO) entries
+    if (buckets.size > maxBuckets) {
+      const excess = buckets.size - maxBuckets;
+      let deleted = 0;
+      for (const k of buckets.keys()) {
+        if (deleted >= excess) break;
+        buckets.delete(k);
+        deleted++;
+      }
+    }
+  }
 
   return {
     take(key: string): RateLimitResult {
@@ -24,6 +60,11 @@ export function createInMemoryRateLimiter(
       const current = buckets.get(key);
       if (!current || now >= current.resetAt) {
         buckets.set(key, { count: 1, resetAt: now + windowMs });
+
+        if (buckets.size > cleanupThreshold) {
+          cleanup(now);
+        }
+
         return {
           limited: false,
           retryAfterSeconds: Math.ceil(windowMs / 1000),

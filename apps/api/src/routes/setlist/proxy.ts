@@ -20,7 +20,7 @@ export async function handleSetlistProxy(setlistIdOrUrl: string): Promise<Setlis
       error: {
         status: 503,
         error: {
-          error: 'Setlist.fm API key not configured.',
+          error: 'SETLISTFM_API_KEY is not set. Copy .env.example to .env and add your key.',
           code: API_ERROR.SERVICE_UNAVAILABLE,
         },
       },

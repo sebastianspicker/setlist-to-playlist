@@ -100,7 +100,7 @@ export function useSetlistImportState(): UseSetlistImportState {
         return false;
       }
     } catch (err) {
-      if ((err as { name?: string })?.name === 'AbortError') return false;
+      if (err instanceof DOMException && err.name === 'AbortError') return false;
       if (currentRequestRef.current !== trimmed) return false;
       setError(getErrorMessage(err, 'Network error.'));
       setSetlist(null);

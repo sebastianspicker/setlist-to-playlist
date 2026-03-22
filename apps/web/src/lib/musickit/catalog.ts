@@ -1,5 +1,6 @@
 import { initMusicKit } from './client';
-import type { AppleMusicTrack } from './types';
+import type { AppleMusicTrack, MusicKitSearchResponse } from './types';
+import { throwIfMusicKitError } from './types';
 
 const SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
 const SEARCH_CACHE_MAX_SIZE = 500;
@@ -39,16 +40,8 @@ export async function searchCatalog(term: string, limit = 5): Promise<AppleMusic
   });
   const path = `/v1/catalog/${storefront}/search?${params.toString()}`;
 
-  const data = (await music.music.api(path)) as {
-    results?: {
-      songs?: { data?: Array<{ id: string; attributes?: { name?: string; artistName?: string } }> };
-    };
-    errors?: Array<{ detail?: string; status?: string }>;
-  };
-  if (data?.errors && Array.isArray(data.errors) && data.errors.length > 0) {
-    const detail = data.errors.map((e) => e.detail ?? e.status ?? 'Unknown').join('; ');
-    throw new Error(`Catalog search failed: ${detail}`);
-  }
+  const data = (await music.music.api(path)) as MusicKitSearchResponse;
+  throwIfMusicKitError(data, 'Catalog search failed');
   const songs = data?.results?.songs?.data ?? [];
   const tracks: AppleMusicTrack[] = songs.map((s) => ({
     id: s.id,

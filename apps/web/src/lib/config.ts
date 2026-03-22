@@ -1,7 +1,7 @@
 /**
  * Base URL for the backend API (dev-token, setlist proxy).
  * Leave NEXT_PUBLIC_API_URL unset for same-origin (default).
- * DCI-031: Trim whitespace so leading/trailing spaces do not produce invalid URLs.
+ * Trim whitespace so leading/trailing spaces do not produce invalid URLs.
  */
 export const API_BASE_URL: string =
   typeof process.env.NEXT_PUBLIC_API_URL === 'string' &&

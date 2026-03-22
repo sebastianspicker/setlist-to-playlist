@@ -58,7 +58,7 @@ describe('handleSetlistProxy', () => {
     expect(isErr(result)).toBe(true);
     if (isErr(result)) {
       expect(result.error.status).toBe(503);
-      expect(result.error.error.error).toContain('API key');
+      expect(result.error.error.error).toContain('SETLISTFM_API_KEY');
       expect(result.error.error.code).toBe(API_ERROR.SERVICE_UNAVAILABLE);
     }
   });
