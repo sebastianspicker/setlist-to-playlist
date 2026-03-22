@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.2.1] – 2026-03-22
+
+### Added
+
+- Testing infrastructure: `@testing-library/react`, `@testing-library/jest-dom`, `jsdom`
+- Component tests: `useFlowState` (6), `useMatchingSuggestions` (6), `SetlistImportView` (5), `MatchingView` (3)
+- CSP middleware tests (8) verifying all security headers and directives
+- RTL smoke test for infrastructure verification
+
+### Fixed
+
+- Accessibility: search result buttons now have descriptive `aria-label` attributes
+- Dynamic import loading fallbacks now use `StatusText` component for visual consistency
+- `console.error` in error boundary gated to development mode only
+- Removed redundant `.then((value) => value)` in `useAsyncAction`
+- Added `settled` flag to `waitForMusicKit` timeout to prevent resolve/reject race
+
+### Metrics
+
+- Tests: 202 → 231 (+29 tests, +6 test files)
+- 3/3 stability runs pass, zero flaky tests
+
 ## [0.2.0] – 2026-03-22
 
 ### Fixed
