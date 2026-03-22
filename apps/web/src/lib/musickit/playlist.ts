@@ -1,5 +1,10 @@
 import { initMusicKit } from './client';
-import type { CreatePlaylistResult } from './types';
+import type {
+  CreatePlaylistResult,
+  MusicKitPlaylistCreateResponse,
+  MusicKitAddTracksResponse,
+} from './types';
+import { throwIfMusicKitError } from './types';
 
 export async function createLibraryPlaylist(name: string): Promise<CreatePlaylistResult> {
   const music = await initMusicKit();
@@ -13,14 +18,8 @@ export async function createLibraryPlaylist(name: string): Promise<CreatePlaylis
   const res = (await music.music.api(path, {
     method: 'POST',
     data: body,
-  })) as {
-    data?: Array<{ id: string; attributes?: { url?: string } }>;
-    errors?: Array<{ detail?: string; status?: string }>;
-  };
-  if (res?.errors && Array.isArray(res.errors) && res.errors.length > 0) {
-    const detail = res.errors.map((e) => e.detail ?? e.status ?? 'Unknown').join('; ');
-    throw new Error(`Failed to create playlist: ${detail}`);
-  }
+  })) as MusicKitPlaylistCreateResponse;
+  throwIfMusicKitError(res, 'Failed to create playlist');
   const playlist = Array.isArray(res?.data) ? res.data[0] : res?.data;
   if (!playlist?.id) throw new Error('Failed to create playlist');
   return { id: playlist.id, url: playlist.attributes?.url };
@@ -50,10 +49,9 @@ export async function addTracksToLibraryPlaylist(
     data: validIds.map((id) => ({ id: id.trim(), type: 'songs' as const })),
   };
   const res = (await music.music.api(path, { method: 'POST', data })) as
-    | { data?: unknown[]; errors?: Array<{ detail?: string; status?: string }> }
+    | MusicKitAddTracksResponse
     | undefined;
-  if (res?.errors && Array.isArray(res.errors) && res.errors.length > 0) {
-    const detail = res.errors.map((e) => e.detail ?? e.status ?? 'Unknown').join('; ');
-    throw new Error(`Adding tracks to playlist failed: ${detail}`);
+  if (res) {
+    throwIfMusicKitError(res, 'Adding tracks to playlist failed');
   }
 }
