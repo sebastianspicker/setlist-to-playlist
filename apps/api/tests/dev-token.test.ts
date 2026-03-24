@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { handleDevToken } from '../src/routes/apple/dev-token.js';
 import { saveEnv, restoreEnv } from './helpers/env.js';
 
+// NOTE: The PEM file at this path is a TEST-ONLY key generated for CI/fixture
+// purposes. It is NOT a production credential and has no access to real services.
 const FIXTURE_KEY_PATH = join(process.cwd(), 'tests/fixtures/apple-test-key.pem');
 const APPLE_ENV_KEYS = ['APPLE_TEAM_ID', 'APPLE_KEY_ID', 'APPLE_PRIVATE_KEY'];
 

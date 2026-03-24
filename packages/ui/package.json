@@ -6,8 +6,8 @@
   "types": "./src/index.ts",
   "scripts": {
     "build": "echo 'No build step'",
-    "lint": "echo 'No lint'",
-    "test": "echo 'No tests'"
+    "lint": "eslint src/",
+    "test": "echo 'TODO: Add tests for UI components'"
   },
   "devDependencies": {
     "@types/react": "^19.0.1",

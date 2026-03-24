@@ -25,7 +25,7 @@ export function parseSetlistIdFromInput(idOrUrl: string): string | null {
       const withoutHtml = segment.replace(/\.html$/i, '');
       const idPart = withoutHtml.split('-').pop();
       if (idPart && /^[a-f0-9]{4,12}$/i.test(idPart)) return idPart;
-      if (withoutHtml && /^[a-f0-9-]+$/i.test(withoutHtml)) return withoutHtml;
+      if (withoutHtml && /^[a-f0-9-]{4,64}$/i.test(withoutHtml)) return withoutHtml;
     } catch {
       return null;
     }

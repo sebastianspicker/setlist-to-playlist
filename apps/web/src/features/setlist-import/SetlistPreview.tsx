@@ -37,7 +37,7 @@ export const SetlistPreview = memo(function SetlistPreview({ setlist }: SetlistP
         }}
       >
         {tracks.map((t, i) => (
-          <li key={i} style={{ marginBottom: '0.25rem' }}>
+          <li key={`${t.name}-${t.info ?? ''}-${i}`} style={{ marginBottom: '0.25rem' }}>
             {t.name}
             {t.info ? (
               <span style={{ color: 'var(--text-muted)', fontSize: '0.9em' }}> — {t.info}</span>

@@ -1,4 +1,5 @@
 {
+  "_note": "A service worker (sw.js) is required for full PWA support (offline, install prompt). Add one when offline functionality is implemented.",
   "name": "Setlist to Playlist",
   "short_name": "Setlist2Playlist",
   "description": "Import a setlist from setlist.fm and create an Apple Music playlist.",

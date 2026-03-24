@@ -25,10 +25,10 @@ export function ErrorAlert({ message, onRetry, retryLabel = 'Try again' }: Error
       style={{
         marginTop: '0.75rem',
         padding: '0.75rem',
-        background: '#fef2f2',
-        border: '1px solid #fecaca',
+        background: 'rgba(239, 68, 68, 0.1)',
+        border: '1px solid rgba(239, 68, 68, 0.3)',
         borderRadius: '4px',
-        color: '#b91c1c',
+        color: '#fca5a5',
       }}
     >
       <p style={{ margin: 0 }}>{message}</p>

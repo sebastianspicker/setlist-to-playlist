@@ -3,7 +3,11 @@ import type { NextRequest } from 'next/server';
 
 const isDev = process.env.NODE_ENV === 'development';
 
-// CSP directives — Next.js requires 'unsafe-inline' for styles and 'unsafe-eval' in dev mode.
+// CSP directives — Next.js requires 'unsafe-inline' for styles and inline
+// scripts it injects at build time. 'unsafe-eval' is added only in dev mode
+// for HMR/Fast Refresh. When Next.js ships first-class nonce-based CSP support,
+// we should migrate to nonce-based script-src and style-src to eliminate
+// 'unsafe-inline'. Track: https://github.com/vercel/next.js/discussions/54907
 const cspDirectives = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline' https://js-cdn.music.apple.com${isDev ? " 'unsafe-eval'" : ''}`,
