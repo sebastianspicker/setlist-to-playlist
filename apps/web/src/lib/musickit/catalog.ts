@@ -8,15 +8,20 @@ const searchCache = new Map<string, { tracks: AppleMusicTrack[]; expires: number
 
 function evictSearchCache(): void {
   if (searchCache.size <= SEARCH_CACHE_MAX_SIZE) return;
+
+  // Phase 1: remove expired entries
   const now = Date.now();
-  const toDelete: string[] = [];
   for (const [key, entry] of searchCache.entries()) {
-    if (now > entry.expires) toDelete.push(key);
+    if (now > entry.expires) searchCache.delete(key);
   }
-  toDelete.forEach((k) => searchCache.delete(k));
+
+  // Phase 2: if still over max, delete the oldest 20% by timestamp
   if (searchCache.size > SEARCH_CACHE_MAX_SIZE) {
-    const keys = [...searchCache.keys()];
-    keys.slice(0, searchCache.size - SEARCH_CACHE_MAX_SIZE).forEach((k) => searchCache.delete(k));
+    const entries = [...searchCache.entries()].sort((a, b) => a[1].expires - b[1].expires);
+    const deleteCount = Math.ceil(entries.length * 0.2);
+    for (let i = 0; i < deleteCount; i++) {
+      searchCache.delete(entries[i]![0]);
+    }
   }
 }
 
@@ -26,7 +31,8 @@ function evictSearchCache(): void {
  */
 export async function searchCatalog(term: string, limit = 5): Promise<AppleMusicTrack[]> {
   const music = await initMusicKit();
-  const storefront = music.storefrontId || 'us';
+  const rawStorefront = music.storefrontId || 'us';
+  const storefront = /^[a-z]{2}$/i.test(rawStorefront) ? rawStorefront : 'us';
   const cacheKey = `${storefront}:${term}:${limit}`;
   const entry = searchCache.get(cacheKey);
   if (entry && Date.now() < entry.expires) return entry.tracks;

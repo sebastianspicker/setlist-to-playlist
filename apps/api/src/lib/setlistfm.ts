@@ -25,7 +25,8 @@ function evictExpired(): void {
 }
 
 function setCached(id: string, body: unknown): void {
-  // With CACHE_EVICT_THRESHOLD at 200, the risk of OOM from standard setlist JSON is negligible.
+  // Skip caching oversized responses to prevent memory bloat.
+  if (JSON.stringify(body).length > 500_000) return;
 
   cache.set(id, { body, expires: Date.now() + CACHE_TTL_MS });
   if (cache.size > CACHE_EVICT_THRESHOLD) {

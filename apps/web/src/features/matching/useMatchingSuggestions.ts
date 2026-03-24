@@ -30,11 +30,12 @@ export function useMatchingSuggestions(setlist: Setlist): UseMatchingSuggestions
   const [loadingSuggestions, setLoadingSuggestions] = useState(true);
   const [suggestionError, setSuggestionError] = useState(false);
   const runIdRef = useRef(0);
+  const runIdCounter = useRef(0);
 
   const signature = useMemo(() => getSetlistSignature(setlist), [setlist]);
 
   const autoMatchAll = useCallback(async () => {
-    const localRunId = Date.now();
+    const localRunId = ++runIdCounter.current;
     runIdRef.current = localRunId;
     const entriesFlat = flattenSetlistToEntries(setlist);
     if (entriesFlat.length === 0) {
@@ -116,7 +117,7 @@ export function useMatchingSuggestions(setlist: Setlist): UseMatchingSuggestions
   }, []);
 
   const resetMatches = useCallback(() => {
-    runIdRef.current = Date.now();
+    runIdRef.current = ++runIdCounter.current;
     setMatches(toInitialMatches(setlist));
     setSuggestionError(false);
     setLoadingSuggestions(false);

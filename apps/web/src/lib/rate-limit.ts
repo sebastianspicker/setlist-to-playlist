@@ -86,6 +86,14 @@ export function createInMemoryRateLimiter(
   };
 }
 
+/**
+ * Extract a client identifier from request headers for rate limiting.
+ *
+ * **Important:** This relies on `X-Forwarded-For` and `X-Real-IP` headers,
+ * which are only trustworthy when the application sits behind a trusted
+ * reverse proxy (e.g., Vercel, nginx, Cloudflare) that sets these headers.
+ * Without a trusted proxy, clients can spoof these headers to bypass rate limits.
+ */
 export function extractClientKeyFromHeaders(headers: Headers, fallback = 'unknown'): string {
   const xff = headers.get('x-forwarded-for');
   if (xff) {

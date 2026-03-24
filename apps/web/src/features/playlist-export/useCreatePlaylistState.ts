@@ -136,10 +136,20 @@ export function useCreatePlaylistState({
   async function handleAddRemainingTracks() {
     const target = resumeState ?? (created ? { ...created, remainingIds: [...songIds] } : null);
     if (!target || target.remainingIds.length === 0) return;
+
+    // Filter out IDs that were already successfully added (tracked via sessionStorage
+    // remainingIds) to prevent duplicate tracks on retry. Note: this only covers IDs
+    // known to sessionStorage; partial adds within a single batch are not tracked.
+    const alreadyAdded = new Set(
+      songIds.filter((id) => !target.remainingIds.includes(id))
+    );
+    const idsToAdd = target.remainingIds.filter((id) => !alreadyAdded.has(id));
+    if (idsToAdd.length === 0) return;
+
     setAddTracksError(null);
     setLoading(true);
     try {
-      await addTracksToLibraryPlaylist(target.id, target.remainingIds);
+      await addTracksToLibraryPlaylist(target.id, idsToAdd);
       setResumeState(null);
       writeResume(setlist.id, null);
       setAddTracksError(null);

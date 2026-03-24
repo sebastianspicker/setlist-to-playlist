@@ -34,7 +34,11 @@ export async function fetchJson<T>(url: string, init?: RequestInit): Promise<Res
   }
   let data: unknown;
   try {
-    data = await res.json();
+    const text = await res.text();
+    if (text.length > MAX_JSON_RESPONSE_BYTES) {
+      return { ok: false, error: 'Response too large.' };
+    }
+    data = JSON.parse(text);
   } catch {
     return { ok: false, error: 'Invalid response (non-JSON).' };
   }

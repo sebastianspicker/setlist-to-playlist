@@ -50,7 +50,11 @@ export async function GET(request: NextRequest) {
   try {
     const result = await handleSetlistProxy(id);
     if (isErr(result)) {
-      return jsonResponse(result.error.error, result.error.status, request, CACHE_NO_STORE);
+      const payload =
+        result.error.status >= 500
+          ? { error: 'setlist.fm is temporarily unavailable', code: result.error.error.code }
+          : result.error.error;
+      return jsonResponse(payload, result.error.status, request, CACHE_NO_STORE);
     }
     return jsonResponse(result.value.body, 200, request, CACHE_HIT);
   } catch {

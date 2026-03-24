@@ -35,6 +35,7 @@ export function useTrackSearch({ matches, setMatch }: UseTrackSearchParams): Use
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState(false);
   const searchRunIdRef = useRef(0);
+  const searchRunIdCounter = useRef(0);
   const searchQueryRef = useRef(searchQuery);
   searchQueryRef.current = searchQuery;
 
@@ -53,7 +54,7 @@ export function useTrackSearch({ matches, setMatch }: UseTrackSearchParams): Use
         searchQueryRef.current.trim() ||
         buildSearchQuery(row.setlistEntry.name, row.setlistEntry.artist);
       if (!q) return;
-      const runId = Date.now();
+      const runId = ++searchRunIdCounter.current;
       searchRunIdRef.current = runId;
       setSearching(true);
       setSearchError(false);

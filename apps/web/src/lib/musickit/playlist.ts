@@ -44,7 +44,7 @@ export async function addTracksToLibraryPlaylist(
   if (!music.isAuthorized) {
     throw new Error('Not authorized. Please connect Apple Music first.');
   }
-  const path = `/v1/me/library/playlists/${playlistId}/tracks`;
+  const path = `/v1/me/library/playlists/${encodeURIComponent(playlistId)}/tracks`;
   const data = {
     data: validIds.map((id) => ({ id: id.trim(), type: 'songs' as const })),
   };

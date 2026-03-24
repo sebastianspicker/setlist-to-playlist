@@ -1,17 +1,27 @@
 const METADATA_KEYWORDS =
   '(?:live|acoustic|remaster(?:ed)?|radio\\s+edit|bonus\\s+track|live\\s+version)';
 
+/** Regex to strip parentheticals containing metadata keywords (e.g. "(2019 Remastered)"). */
+const PARENTHETICAL_RE = new RegExp(
+  `\\s*\\(\\s*(?:\\d{4}\\s+)?${METADATA_KEYWORDS}[^)]*\\)\\s*`,
+  'gi'
+);
+
+/** Regex to strip unclosed parentheticals with metadata keywords at end of string. */
+const UNCLOSED_PAREN_RE = new RegExp(
+  `\\s*\\(\\s*(?:\\d{4}\\s+)?${METADATA_KEYWORDS}[^)]*$`,
+  'gi'
+);
+
 /** Strip metadata (feat., live, remaster, etc.) from a track name for search. */
 export function normalizeTrackName(name: string): string {
   if (!name || typeof name !== 'string') return '';
 
   // 1. Strip parentheticals containing metadata (including optional year prefix, e.g. "(2019 Remastered)")
-  const parenthetical = new RegExp(
-    `\\s*\\(\\s*(?:\\d{4}\\s+)?${METADATA_KEYWORDS}[^)]*\\)\\s*`,
-    'gi'
-  );
-  let s = name.replace(parenthetical, ' ');
-  s = s.replace(new RegExp(`\\s*\\(\\s*(?:\\d{4}\\s+)?${METADATA_KEYWORDS}[^)]*$`, 'gi'), ' ');
+  PARENTHETICAL_RE.lastIndex = 0;
+  let s = name.replace(PARENTHETICAL_RE, ' ');
+  UNCLOSED_PAREN_RE.lastIndex = 0;
+  s = s.replace(UNCLOSED_PAREN_RE, ' ');
 
   // 2. feat. segment before trailing dash: if "feat. X - <metadata>", keep the metadata; otherwise remove entire feat. segment
   const featWithMetadata = new RegExp(
