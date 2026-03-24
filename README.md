@@ -141,8 +141,6 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for data flow and [docs/index.md](docs/in
 │   ├── tech/
 │   ├── adr/
 │   └── code-inspection-findings.md
-├── infra/
-│   └── README.md                 # deploy/, nginx/, terraform/ reserved when needed
 └── scripts/
     ├── seed-demo-setlists.ts
     └── export-diagnostics.ts

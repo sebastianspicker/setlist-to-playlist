@@ -4,52 +4,6 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [0.2.1] – 2026-03-22
-
-### Added
-
-- Testing infrastructure: `@testing-library/react`, `@testing-library/jest-dom`, `jsdom`
-- Component tests: `useFlowState` (6), `useMatchingSuggestions` (6), `SetlistImportView` (5), `MatchingView` (3)
-- CSP middleware tests (8) verifying all security headers and directives
-- RTL smoke test for infrastructure verification
-
-### Fixed
-
-- Accessibility: search result buttons now have descriptive `aria-label` attributes
-- Dynamic import loading fallbacks now use `StatusText` component for visual consistency
-- `console.error` in error boundary gated to development mode only
-- Removed redundant `.then((value) => value)` in `useAsyncAction`
-- Added `settled` flag to `waitForMusicKit` timeout to prevent resolve/reject race
-
-### Metrics
-
-- Tests: 202 → 231 (+29 tests, +6 test files)
-- 3/3 stability runs pass, zero flaky tests
-
-## [0.2.0] – 2026-03-22
-
-### Fixed
-
-- MusicKit `writeResume` now handles `QuotaExceededError` gracefully instead of crashing
-- Replaced inline type assertion in `playlist.ts` with proper `MusicKitAddTracksResponse` type
-
-### Security
-
-- Added Content-Security-Policy middleware with MusicKit CDN and Apple API whitelist
-- Added `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` headers via middleware
-
-### Testing
-
-- Added MusicKit client integration tests (init, cache, failure reset, concurrency, missing config)
-- Total test count: 202 (up from 197)
-
-### Analysis
-
-- Full happy-path trace of import→preview→match→export flow
-- Error path audit confirming all network failures surface user-visible messages
-- Concurrency audit confirming race condition guards across all async operations
-- Browser edge case audit (JS disabled, storage blocked, slow network, CDN blocked)
-
 ## [Unreleased]
 
 ### Documentation & Cleanup
@@ -83,7 +37,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Added import history with local persistence and quick re-import actions.
 - Added export QoL features:
   - Optional ordered track dedupe before playlist creation.
-  - Session-based resume for failed “add tracks” operations.
+  - Session-based resume for failed "add tracks" operations.
 
 ### Core Utilities & Tests
 
@@ -92,6 +46,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - `dedupeTrackIdsOrdered`
   - `getSetlistSignature`
 - Expanded tests in `packages/core` and `apps/web` (rate limiter).
+
+## [0.2.1] – 2026-03-22
+
+### Added
+
+- Testing infrastructure: `@testing-library/react`, `@testing-library/jest-dom`, `jsdom`
+- Component tests: `useFlowState` (6), `useMatchingSuggestions` (6), `SetlistImportView` (5), `MatchingView` (3)
+- CSP middleware tests (8) verifying all security headers and directives
+- RTL smoke test for infrastructure verification
+
+### Fixed
+
+- Accessibility: search result buttons now have descriptive `aria-label` attributes
+- Dynamic import loading fallbacks now use `StatusText` component for visual consistency
+- `console.error` in error boundary gated to development mode only
+- Removed redundant `.then((value) => value)` in `useAsyncAction`
+- Added `settled` flag to `waitForMusicKit` timeout to prevent resolve/reject race
+
+## [0.2.0] – 2026-03-22
+
+### Fixed
+
+- MusicKit `writeResume` now handles `QuotaExceededError` gracefully instead of crashing
+- Replaced inline type assertion in `playlist.ts` with proper `MusicKitAddTracksResponse` type
+
+### Security
+
+- Added Content-Security-Policy middleware with MusicKit CDN and Apple API whitelist
+- Added `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` headers via middleware
+
+### Testing
+
+- Added MusicKit client integration tests (init, cache, failure reset, concurrency, missing config)
 
 ## [0.1.0] – Initial
 

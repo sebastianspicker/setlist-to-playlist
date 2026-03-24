@@ -29,7 +29,7 @@ pnpm format:check && pnpm lint && pnpm build && pnpm test
 - **Location:** `tests/` directory in each package/app (`packages/core/tests/`, `apps/web/tests/`, etc.).
 - **Naming:** `*.test.ts`.
 - **Run:** `pnpm test` from root runs all workspace tests. To run a single package: `pnpm --filter core test`.
-- **Scope:** ~197 tests across 23 files covering normalization, search-query building, setlist mapping, dedupe, CORS headers, fetch helpers, API URL construction, MusicKit token/catalog/playlist, rate limiter memory bounds, and route handlers.
+- **Scope:** 30 test files covering normalization, search-query building, setlist mapping, dedupe, CORS headers, fetch helpers, API URL construction, MusicKit token/catalog/playlist, rate limiter memory bounds, route handlers, component rendering, and hook state transitions.
 - **Patterns:** `vi.mock` for module-level mocks, `vi.stubGlobal` for browser globals (`fetch`, `window.sessionStorage`). Standard `describe`/`it` structure with `beforeEach`/`afterEach` for cleanup.
 
 ## Pre-commit hooks (optional)

@@ -28,7 +28,7 @@ How a coding agent (or human) should work in this repo.
 
 ## Test Infrastructure
 
-~160 tests across 23 test files (Vitest). Patterns used throughout:
+30 test files (Vitest). Patterns used throughout:
 
 - `vi.mock` for module-level mocks, `vi.stubGlobal` for browser globals (e.g. `fetch`, `window.sessionStorage`).
 - Standard `describe` / `it` structure; `beforeEach` / `afterEach` for timer and mock cleanup.
