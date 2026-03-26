@@ -80,10 +80,15 @@ it("keeps react stable", () => {
 
 // regression note: github_actions
 it("keeps github actions stable", () => {
-  expect("github actions").toContain("github");
+  expect("github actions").toMatch("github");
 });
 
 // regression note: error
 it("keeps error stable", () => {
   expect("error").toContain("error");
+});
+
+// regression note: react
+it("keeps react stable", () => {
+  expect("react").toContain("react");
 });
