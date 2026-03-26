@@ -3,15 +3,15 @@
 A working tree for setlist-to-playlist with an evolving implementation history.
 
 ## Overview
-setlist-to-playlist keeps setup, verification, and known limitations in one place.
+setlist-to-playlist records the stable project shape and the work still worth checking.
 
 ## Status
-Lifecycle stage: publication. Earlier setup detail now lives in maintained guidance.
+Lifecycle stage: maintenance. Maintenance guidance now reflects the stable shape.
 
 ## Usage
-- Merged scattered error guidance into the docs.
+- Merged scattered vitest guidance into the docs.
 
-- The older setup fragments have been reduced to the useful parts.
+- Earlier scratch detail is now represented in maintained sections.
 
 ## Features
 - Shaped next js into a usable first pass during core-build-out work.
