@@ -1,0 +1,38 @@
+{
+  "_note": "A service worker (sw.js) is required for full PWA support (offline, install prompt). Add one when offline functionality is implemented.",
+  "name": "Setlist to Playlist",
+  "short_name": "Setlist2Playlist",
+  "description": "Turn any concert setlist into an Apple Music playlist. Paste a setlist.fm link, preview the songs, and save the playlist to your library.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "categories": ["music", "entertainment"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
