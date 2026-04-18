@@ -37,7 +37,9 @@ export function MatchingView({ setlist, onProceedToCreatePlaylist }: MatchingVie
       <FlowStepIndicator step={3} total={4} label="Match songs" />
       <SectionTitle>Match songs</SectionTitle>
       <p className="muted-block">
-        We found Apple Music tracks for each song. Review the matches below — tap <strong>Change</strong> to pick a different version, or <strong>Skip</strong> songs you do not want in the playlist.
+        We found Apple Music tracks for each song. Review the matches below — tap{' '}
+        <strong>Change</strong> to pick a different version, or <strong>Skip</strong> songs you do
+        not want in the playlist.
       </p>
 
       <MatchingBulkActions
@@ -55,7 +57,8 @@ export function MatchingView({ setlist, onProceedToCreatePlaylist }: MatchingVie
 
       {suggestionError && !loadingSuggestions && (
         <p role="alert" className="warning-banner">
-          Some songs could not be matched automatically. Use the <strong>Search</strong> button next to unmatched songs to find them manually.
+          Some songs could not be matched automatically. Use the <strong>Search</strong> button next
+          to unmatched songs to find them manually.
         </p>
       )}
 

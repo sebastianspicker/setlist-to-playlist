@@ -52,7 +52,12 @@ describe('useMatchingSuggestions', () => {
       expect(result.current.loadingSuggestions).toBe(false);
     });
 
-    expect(mockSearchCatalog).toHaveBeenCalledTimes(3);
+    expect(mockSearchCatalog.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(mockSearchCatalog.mock.calls.slice(0, 3)).toEqual([
+      ['Song A Test Artist', 1],
+      ['Song B Test Artist', 1],
+      ['Song C Test Artist', 1],
+    ]);
   });
 
   it('setMatch updates a specific row', async () => {

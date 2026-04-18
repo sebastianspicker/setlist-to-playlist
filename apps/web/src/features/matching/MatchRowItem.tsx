@@ -30,9 +30,11 @@ export const MatchRowItem = React.memo(function MatchRowItem({
   onChoose,
 }: MatchRowItemProps) {
   const statusClass =
-    row.status === 'matched' ? 'matching-row--matched' :
-    row.status === 'skipped' ? 'matching-row--skipped' :
-    'matching-row--unmatched';
+    row.status === 'matched'
+      ? 'matching-row--matched'
+      : row.status === 'skipped'
+        ? 'matching-row--skipped'
+        : 'matching-row--unmatched';
 
   return (
     <li className={`matching-row ${statusClass}`}>
@@ -47,7 +49,9 @@ export const MatchRowItem = React.memo(function MatchRowItem({
         <div className="matching-track-result">
           {row.appleTrack ? (
             <span className="match-found">
-              <span className="match-indicator" aria-hidden="true">&#x2713;</span>
+              <span className="match-indicator" aria-hidden="true">
+                &#x2713;
+              </span>
               {row.appleTrack.name}
               {row.appleTrack.artistName && (
                 <span className="muted-inline"> · {row.appleTrack.artistName}</span>
@@ -55,12 +59,16 @@ export const MatchRowItem = React.memo(function MatchRowItem({
             </span>
           ) : row.status === 'skipped' ? (
             <span className="match-skipped">
-              <span className="match-indicator match-indicator--skip" aria-hidden="true">&#x2014;</span>
+              <span className="match-indicator match-indicator--skip" aria-hidden="true">
+                &#x2014;
+              </span>
               Skipped
             </span>
           ) : (
             <span className="match-missing">
-              <span className="match-indicator match-indicator--missing" aria-hidden="true">?</span>
+              <span className="match-indicator match-indicator--missing" aria-hidden="true">
+                ?
+              </span>
               No match found
             </span>
           )}

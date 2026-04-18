@@ -1,6 +1,21 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { fetchJson } from '../src/lib/fetch';
 
+function streamResponse(body: string, status = 200): Response {
+  return new Response(
+    new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(body));
+        controller.close();
+      },
+    }),
+    {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    }
+  );
+}
+
 /** Helper to create a minimal Response-like object for mocking fetch. */
 function fakeResponse(
   body: unknown,
@@ -115,5 +130,14 @@ describe('fetchJson', () => {
     const result = await fetchJson('https://api.example.com/fail');
 
     expect(result).toEqual({ ok: false, error: 'Request failed (500)' });
+  });
+
+  it('returns error for oversized streamed responses without Content-Length', async () => {
+    const oversizedJson = JSON.stringify({ data: 'x'.repeat(10 * 1024 * 1024) });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(streamResponse(oversizedJson)));
+
+    const result = await fetchJson('https://api.example.com/chunked');
+
+    expect(result).toEqual({ ok: false, error: 'Response too large.' });
   });
 });

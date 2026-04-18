@@ -1,6 +1,7 @@
 /**
  * Extracts the raw setlist ID from either a direct string or a full setlist.fm URL.
- * Strictly validates input formats to avoid sending malformed IDs to the API.
+ * Strictly validates the 4-12 hex character IDs used across this project to avoid
+ * sending malformed identifiers to the API.
  */
 export function parseSetlistIdFromInput(idOrUrl: string): string | null {
   const trimmed = idOrUrl.trim();

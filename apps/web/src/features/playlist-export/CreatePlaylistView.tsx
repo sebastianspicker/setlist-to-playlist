@@ -36,17 +36,69 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
     () => selectedSongIds.length - songIds.length,
     [selectedSongIds, songIds]
   );
+  const incompleteState = resumeState && resumeState.remainingIds.length > 0 ? resumeState : null;
 
-  if (created || resumeState) {
-    const current = resumeState ?? created;
-    const rawUrl = current?.url?.trim();
+  if (incompleteState) {
+    const rawUrl = incompleteState.url?.trim();
+    const addedCount = Math.max(songIds.length - incompleteState.remainingIds.length, 0);
+    const remainingCount = incompleteState.remainingIds.length;
+    const isSafeUrl = rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'));
+    return (
+      <div role="status" className="glass-panel success-panel">
+        <p className="success-title">Playlist created, but track import is incomplete.</p>
+        <p className="success-subtitle">
+          {addedCount} of {songIds.length} song{songIds.length !== 1 ? 's' : ''} were added to your
+          Apple Music library. {remainingCount} still need{remainingCount === 1 ? 's' : ''} to be
+          added.
+        </p>
+        {addTracksError ? (
+          <p role="alert" className="error-text" style={{ marginTop: '0.5rem' }}>
+            The playlist exists, but finishing the import failed: {addTracksError}
+          </p>
+        ) : (
+          <p className="muted-block" style={{ marginTop: '0.5rem' }}>
+            Resume the import to finish adding the remaining songs.
+          </p>
+        )}
+        <LoadingButton
+          variant="secondary"
+          onClick={handleAddRemainingTracks}
+          loading={loading}
+          loadingChildren="Adding remaining songs…"
+          style={{ marginTop: '1rem' }}
+        >
+          Add remaining songs
+        </LoadingButton>
+        {isSafeUrl ? (
+          <a
+            href={rawUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="premium-button open-playlist-link"
+            style={{ display: 'inline-flex', marginTop: '1rem', textDecoration: 'none' }}
+          >
+            Open in Apple Music
+          </a>
+        ) : (
+          <p className="muted-block" style={{ marginTop: '0.75rem' }}>
+            Open the Apple Music app to find your playlist while the remaining songs finish
+            importing.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (created) {
+    const rawUrl = created.url?.trim();
     const isSafeUrl = rawUrl && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'));
     return (
       <div role="status" className="glass-panel success-panel">
         <p className="success-title">Your playlist is ready!</p>
         <p className="success-subtitle">
           {setlist.artist}
-          {setlist.venue ? ` at ${setlist.venue}` : ''} — {count} song{count !== 1 ? 's' : ''} added to your Apple Music library.
+          {setlist.venue ? ` at ${setlist.venue}` : ''} — {count} song{count !== 1 ? 's' : ''} added
+          to your Apple Music library.
         </p>
         {addTracksError ? (
           <>
@@ -90,9 +142,8 @@ export function CreatePlaylistView({ setlist, matchRows }: CreatePlaylistViewPro
     <section aria-label="Create playlist" className="glass-panel" style={{ marginTop: '2rem' }}>
       <SectionTitle>Save to Apple Music</SectionTitle>
       <p className="export-ready-text">
-        Ready to create a playlist with{' '}
-        <strong className="accent-inline">{count}</strong> song{count !== 1 ? 's' : ''} from{' '}
-        <strong>{setlist.artist}</strong>
+        Ready to create a playlist with <strong className="accent-inline">{count}</strong> song
+        {count !== 1 ? 's' : ''} from <strong>{setlist.artist}</strong>
         {setlist.venue ? ` at ${setlist.venue}` : ''}.
       </p>
 

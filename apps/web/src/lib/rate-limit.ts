@@ -95,6 +95,11 @@ export function createInMemoryRateLimiter(
  * Without a trusted proxy, clients can spoof these headers to bypass rate limits.
  */
 export function extractClientKeyFromHeaders(headers: Headers, fallback = 'unknown'): string {
+  const trustProxy = process.env.TRUST_PROXY === '1';
+  if (!trustProxy) {
+    return fallback;
+  }
+
   const xff = headers.get('x-forwarded-for');
   if (xff) {
     const first = xff.split(',')[0]?.trim();

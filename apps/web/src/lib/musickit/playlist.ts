@@ -6,6 +6,32 @@ import type {
 } from './types';
 import { throwIfMusicKitError } from './types';
 
+export interface AddTracksToLibraryPlaylistResult {
+  addedIds: string[];
+  remainingIds: string[];
+}
+
+export class AddTracksToLibraryPlaylistError extends Error {
+  readonly addedIds: string[];
+  readonly remainingIds: string[];
+
+  constructor(
+    message: string,
+    {
+      addedIds,
+      remainingIds,
+    }: {
+      addedIds: string[];
+      remainingIds: string[];
+    }
+  ) {
+    super(message);
+    this.name = 'AddTracksToLibraryPlaylistError';
+    this.addedIds = addedIds;
+    this.remainingIds = remainingIds;
+  }
+}
+
 export async function createLibraryPlaylist(name: string): Promise<CreatePlaylistResult> {
   const music = await initMusicKit();
   if (!music.isAuthorized) {
@@ -31,8 +57,10 @@ export async function createLibraryPlaylist(name: string): Promise<CreatePlaylis
 export async function addTracksToLibraryPlaylist(
   playlistId: string,
   songIds: string[]
-): Promise<void> {
-  if (songIds.length === 0) return;
+): Promise<AddTracksToLibraryPlaylistResult> {
+  if (songIds.length === 0) {
+    return { addedIds: [], remainingIds: [] };
+  }
   if (!playlistId?.trim()) {
     throw new Error('Invalid playlist ID');
   }
@@ -46,16 +74,30 @@ export async function addTracksToLibraryPlaylist(
   }
   const path = `/v1/me/library/playlists/${encodeURIComponent(playlistId)}/tracks`;
   const BATCH_SIZE = 100;
+  let addedCount = 0;
   for (let i = 0; i < validIds.length; i += BATCH_SIZE) {
     const batch = validIds.slice(i, i + BATCH_SIZE);
     const data = {
       data: batch.map((id) => ({ id: id.trim(), type: 'songs' as const })),
     };
-    const res = (await music.music.api(path, { method: 'POST', data })) as
-      | MusicKitAddTracksResponse
-      | undefined;
-    if (res) {
-      throwIfMusicKitError(res, 'Adding tracks to playlist failed');
+    try {
+      const res = (await music.music.api(path, { method: 'POST', data })) as
+        | MusicKitAddTracksResponse
+        | undefined;
+      if (res) {
+        throwIfMusicKitError(res, 'Adding tracks to playlist failed');
+      }
+      addedCount += batch.length;
+    } catch (error) {
+      throw new AddTracksToLibraryPlaylistError(
+        error instanceof Error ? error.message : 'Adding tracks to playlist failed',
+        {
+          addedIds: validIds.slice(0, addedCount),
+          remainingIds: validIds.slice(addedCount),
+        }
+      );
     }
   }
+
+  return { addedIds: validIds, remainingIds: [] };
 }

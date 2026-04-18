@@ -1,7 +1,8 @@
-import { SETLIST_FM_BASE_URL } from '@repo/shared';
+import { readTextWithinLimit, SETLIST_FM_BASE_URL } from '@repo/shared';
 
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const cache = new Map<string, { body: unknown; expires: number }>();
+const MAX_UPSTREAM_RESPONSE_BYTES = 10 * 1024 * 1024;
 
 function getCached(id: string): unknown | null {
   const entry = cache.get(id);
@@ -34,13 +35,39 @@ function setCached(id: string, body: unknown): void {
   }
   if (cache.size > CACHE_EVICT_THRESHOLD) {
     const excess = cache.size - CACHE_EVICT_THRESHOLD;
-    const keys = [...cache.keys()];
-    for (let i = 0; i < excess; i++) cache.delete(keys[i]);
+    let removed = 0;
+    for (const key of cache.keys()) {
+      cache.delete(key);
+      removed += 1;
+      if (removed >= excess) break;
+    }
   }
 }
 
 const MAX_RETRIES_429 = 2;
 const BACKOFF_MS = 1000;
+
+function parseRetryAfterMs(value: string | null): number | null {
+  if (!value) return null;
+
+  const seconds = Number.parseInt(value, 10);
+  if (!Number.isNaN(seconds) && seconds >= 0) {
+    return seconds * 1000;
+  }
+
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) return null;
+
+  return Math.max(0, timestamp - Date.now());
+}
+
+function getRetryDelayMs(res: Response): number {
+  const retryAfterValue =
+    typeof res.headers?.get === 'function' ? res.headers.get('retry-after') : null;
+  const retryAfterMs = parseRetryAfterMs(retryAfterValue);
+  const jitterMs = Math.floor(Math.random() * 100);
+  return Math.max(0, retryAfterMs ?? BACKOFF_MS) + jitterMs;
+}
 
 export type FetchSetlistResult =
   | { ok: true; body: unknown }
@@ -71,7 +98,15 @@ export async function fetchSetlistFromApi(
     if (res.ok) {
       let body: unknown;
       try {
-        body = (await res.json()) as unknown;
+        const text = await readTextWithinLimit(res, MAX_UPSTREAM_RESPONSE_BYTES);
+        if (text === null) {
+          return {
+            ok: false,
+            status: 502,
+            message: 'setlist.fm response was too large.',
+          };
+        }
+        body = JSON.parse(text) as unknown;
         // Setlist responses must be objects, not JSON primitives.
         if (!body || typeof body !== 'object') {
           throw new Error('Invalid structure');
@@ -88,7 +123,14 @@ export async function fetchSetlistFromApi(
       return { ok: true, body };
     }
 
-    const text = await res.text();
+    const text = await readTextWithinLimit(res, MAX_UPSTREAM_RESPONSE_BYTES);
+    if (text === null) {
+      return {
+        ok: false,
+        status: 502,
+        message: 'setlist.fm response was too large.',
+      };
+    }
     try {
       const json = JSON.parse(text) as { message?: string };
       lastMessage = json.message ?? (text || res.statusText);
@@ -98,7 +140,7 @@ export async function fetchSetlistFromApi(
 
     if (res.status === 429) {
       if (attempt < MAX_RETRIES_429) {
-        await new Promise((resolve) => setTimeout(resolve, BACKOFF_MS));
+        await new Promise((resolve) => setTimeout(resolve, getRetryDelayMs(res)));
         continue;
       }
       return {

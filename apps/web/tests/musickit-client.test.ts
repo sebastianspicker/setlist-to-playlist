@@ -7,6 +7,7 @@ vi.mock('../src/lib/config', () => ({
 
 vi.mock('../src/lib/musickit/token', () => ({
   fetchDeveloperToken: vi.fn(),
+  isTokenValid: vi.fn(() => true),
 }));
 
 import { fetchDeveloperToken } from '../src/lib/musickit/token';

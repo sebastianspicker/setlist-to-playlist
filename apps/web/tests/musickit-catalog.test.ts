@@ -51,8 +51,10 @@ describe('searchCatalog', () => {
       { id: 's2', name: 'Song Two', artistName: 'Artist B' },
     ]);
     expect(mockApi).toHaveBeenCalledTimes(1);
-    expect(mockApi.mock.calls[0][0]).toContain('/v1/catalog/us/search');
-    expect(mockApi.mock.calls[0][0]).toContain('term=test+query');
+    const firstCallUrl = mockApi.mock.calls[0]?.[0];
+    expect(firstCallUrl).toBeDefined();
+    expect(firstCallUrl).toContain('/v1/catalog/us/search');
+    expect(firstCallUrl).toContain('term=test+query');
   });
 
   it('cache hit returns cached data without API call', async () => {

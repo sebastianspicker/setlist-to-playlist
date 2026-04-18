@@ -36,9 +36,7 @@ export const SetlistPreview = memo(function SetlistPreview({ setlist }: SetlistP
           {tracks.map((t, i) => (
             <li key={`${t.name}-${t.info ?? ''}-${i}`} className="preview-track-item">
               {t.name}
-              {t.info ? (
-                <span className="muted-inline"> — {t.info}</span>
-              ) : null}
+              {t.info ? <span className="muted-inline"> — {t.info}</span> : null}
             </li>
           ))}
         </ol>

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import Script from 'next/script';
 import '../styles/globals.css';
 
@@ -28,11 +29,13 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
+
   return (
     <html lang="en">
       <head>
@@ -47,6 +50,7 @@ export default function RootLayout({
           src="https://js-cdn.music.apple.com/musickit/v3/musickit.js"
           strategy="afterInteractive"
           crossOrigin="anonymous"
+          nonce={nonce}
         />
         {children}
       </body>

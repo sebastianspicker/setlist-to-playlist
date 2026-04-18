@@ -1,4 +1,5 @@
 import type { Result } from '@repo/shared';
+import { readTextWithinLimit } from '@repo/shared';
 
 /** Max response size to avoid DoS from huge JSON (10 MiB). */
 const MAX_JSON_RESPONSE_BYTES = 10 * 1024 * 1024;
@@ -34,8 +35,8 @@ export async function fetchJson<T>(url: string, init?: RequestInit): Promise<Res
   }
   let data: unknown;
   try {
-    const text = await res.text();
-    if (text.length > MAX_JSON_RESPONSE_BYTES) {
+    const text = await readTextWithinLimit(res, MAX_JSON_RESPONSE_BYTES);
+    if (text === null) {
       return { ok: false, error: 'Response too large.' };
     }
     data = JSON.parse(text);
@@ -44,6 +45,9 @@ export async function fetchJson<T>(url: string, init?: RequestInit): Promise<Res
   }
   if (!res.ok) {
     return { ok: false, error: extractError(data, `Request failed (${res.status})`) };
+  }
+  if (hasErrorString(data)) {
+    return { ok: false, error: data.error };
   }
   return { ok: true, value: data as T };
 }

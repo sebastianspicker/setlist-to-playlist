@@ -46,7 +46,7 @@ Mint an Apple Developer Token (JWT) for MusicKit JS. The token is signed server-
 
 **Parameters:** None.
 
-**Rate limit:** 30 requests per 60 s per client IP (in-memory, fixed-window).
+**Rate limit:** 30 requests per 60 s per client IP (in-memory, fixed-window). Forwarded IP headers are only trusted when `TRUST_PROXY=1` is configured behind a trusted reverse proxy.
 
 **Success (200):**
 
@@ -86,14 +86,14 @@ Proxy to the setlist.fm API. The `SETLISTFM_API_KEY` stays server-side and is ne
 
 **Query parameters:**
 
-| Name  | Type   | Required | Description                                            |
-| ----- | ------ | -------- | ------------------------------------------------------ |
-| `id`  | string | \*       | Setlist ID (e.g. `63de4613`) or a full setlist.fm URL. |
-| `url` | string | \*       | Alias for `id`. Either `id` or `url` must be provided. |
+| Name  | Type   | Required | Description                                                            |
+| ----- | ------ | -------- | ---------------------------------------------------------------------- |
+| `id`  | string | \*       | Setlist ID (4-12 hex chars, e.g. `63de4613`) or a full setlist.fm URL. |
+| `url` | string | \*       | Alias for `id`. Either `id` or `url` must be provided.                 |
 
 \* Exactly one of `id` or `url` is required. Max length: 2000 characters.
 
-**Rate limit:** 20 requests per 60 s per client IP (in-memory, fixed-window).
+**Rate limit:** 20 requests per 60 s per client IP (in-memory, fixed-window). Forwarded IP headers are only trusted when `TRUST_PROXY=1` is configured behind a trusted reverse proxy.
 
 **Success (200):**
 

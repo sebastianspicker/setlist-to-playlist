@@ -254,18 +254,18 @@ describe('Boundary conditions', () => {
       expect(parseSetlistIdFromInput('abcd')).toBe('abcd');
     });
 
-    it('accepts ID with exactly 64 characters (maximum valid length)', () => {
-      const id64 = 'a'.repeat(64);
-      expect(parseSetlistIdFromInput(id64)).toBe(id64);
+    it('accepts ID with exactly 12 characters (maximum valid length)', () => {
+      const id12 = 'a'.repeat(12);
+      expect(parseSetlistIdFromInput(id12)).toBe(id12);
     });
 
     it('rejects ID with 3 characters (too short)', () => {
       expect(parseSetlistIdFromInput('abc')).toBeNull();
     });
 
-    it('rejects ID with 65 characters (too long)', () => {
-      const id65 = 'a'.repeat(65);
-      expect(parseSetlistIdFromInput(id65)).toBeNull();
+    it('rejects ID with 13 characters (too long)', () => {
+      const id13 = 'a'.repeat(13);
+      expect(parseSetlistIdFromInput(id13)).toBeNull();
     });
 
     it('rejects empty string', () => {
