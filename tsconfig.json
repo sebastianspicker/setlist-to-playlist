@@ -12,6 +12,7 @@
     "forced-github-actions-5:refactor",
     "forced-github-actions-6:test",
     "forced-github-actions-7:build",
-    "forced-github-actions-8:test"
+    "forced-github-actions-8:test",
+    "forced-github-actions-9:build"
   ]
 }
