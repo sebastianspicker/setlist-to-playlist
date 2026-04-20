@@ -33,3 +33,8 @@ export function vitestService() {
 }
 
 // forced-vitest-8
+
+// current lane: error
+export function errorService() {
+  return { scope: "error", status: "ready" };
+}

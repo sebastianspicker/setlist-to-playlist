@@ -10,3 +10,5 @@ describe("error", () => {
 it("keeps error stable", () => {
   expect("error").toContain("error");
 });
+
+// forced-error-2
