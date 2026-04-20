@@ -57,7 +57,8 @@ Then open the web app at `http://localhost:3000`. The same process runs both the
 ## Demo
 
 - Live local demo route: `http://localhost:3000/demo`
-- The `/demo` page is static and intended for reproducible screenshots/GitHub previews.
+- The `/demo` page is a **static, no-API-key-required** screen that renders a fixed setlist preview. It is used for reproducible screenshots, CI smoke tests, and GitHub social previews. No real setlist.fm or Apple Music calls are made.
+- To update the demo data, edit the fixture in `apps/web/src/app/demo/`. Update the screenshots in `docs/screenshots/github/` after any significant UI change.
 
 ### Screenshots
 
@@ -190,6 +191,14 @@ Optional (run from repo root with `npx tsx`):
 - **seed-demo-setlists:** `SETLISTFM_API_KEY=your_key npx tsx scripts/seed-demo-setlists.ts` – fetches demo setlists and writes `scripts/fixtures/demo-setlists.json` for local dev or tests.
 - **export-diagnostics:** `npx tsx scripts/export-diagnostics.ts` or `npx tsx scripts/export-diagnostics.ts --out report.json` – exports non-sensitive env/config info for support or debugging (no secrets).
 - **cleanup-repo:** `bash scripts/cleanup-repo.sh` – removes local non-source artifacts (logs, `.DS_Store`, build caches) without touching tracked source files.
+
+## Deployment
+
+See [docs/tech/deployment.md](docs/tech/deployment.md) for full instructions (Vercel, Netlify, self-hosted). The short version:
+
+1. Set the required environment variables (see [Environment](#environment) above and `.env.example`).
+2. Deploy the `apps/web` Next.js app to your platform of choice.
+3. Verify with `GET /api/health` → `{"status":"ok"}`.
 
 ## Verification
 

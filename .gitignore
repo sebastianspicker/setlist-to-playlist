@@ -64,6 +64,12 @@ blob-report/
 .parcel-cache
 .cache/
 
+# Generated / seeded fixtures (script output; may contain live API data)
+scripts/fixtures/
+
+# Test-only key material (generated at runtime; no static key files needed)
+apps/api/tests/fixtures/*.pem
+
 # Backup and temp
 *.bak
 *.backup

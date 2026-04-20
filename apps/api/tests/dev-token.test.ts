@@ -1,12 +1,16 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
+import { generateKeyPairSync } from 'node:crypto';
 import { handleDevToken } from '../src/routes/apple/dev-token.js';
 import { saveEnv, restoreEnv } from './helpers/env.js';
 
-// NOTE: The PEM file at this path is a TEST-ONLY key generated for CI/fixture
-// purposes. It is NOT a production credential and has no access to real services.
-const FIXTURE_KEY_PATH = join(process.cwd(), 'tests/fixtures/apple-test-key.pem');
+// Generate a fresh ES256 (P-256) key pair once per test run — no static key file needed.
+let TEST_PRIVATE_KEY_PEM: string;
+
+beforeAll(() => {
+  const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' });
+  TEST_PRIVATE_KEY_PEM = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string;
+});
+
 const APPLE_ENV_KEYS = ['APPLE_TEAM_ID', 'APPLE_KEY_ID', 'APPLE_PRIVATE_KEY'];
 
 /** JWT shape: three base64url segments separated by dots */
@@ -39,7 +43,7 @@ describe('dev-token', () => {
   it('returns a JWT when credentials are set', async () => {
     process.env.APPLE_TEAM_ID = 'TEST_TEAM_ID';
     process.env.APPLE_KEY_ID = 'TEST_KEY_ID';
-    process.env.APPLE_PRIVATE_KEY = readFileSync(FIXTURE_KEY_PATH, 'utf8');
+    process.env.APPLE_PRIVATE_KEY = TEST_PRIVATE_KEY_PEM;
 
     const result = await handleDevToken();
     expect('token' in result).toBe(true);
