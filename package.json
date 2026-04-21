@@ -5,7 +5,7 @@
     "build": "pnpm -r run build",
     "dev": "pnpm --filter web run dev",
     "lint": "pnpm -r run lint",
-    "typecheck": "pnpm --filter @repo/shared exec tsc --noEmit && pnpm --filter @repo/core exec tsc --noEmit && pnpm --filter api exec tsc --noEmit && pnpm --filter web exec tsc --noEmit",
+    "typecheck": "pnpm --filter @repo/shared run build && pnpm --filter @repo/core run build && pnpm --filter api run build && pnpm --filter web exec tsc --noEmit",
     "test": "pnpm -r run test",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
