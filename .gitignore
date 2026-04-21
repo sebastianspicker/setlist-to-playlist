@@ -1,0 +1,92 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Env and secrets
+.env
+.env.local
+.env.*.local
+.env.development
+.env.test
+.env.production
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+.vercel/
+.netlify/
+
+# IDE and OS
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.lnk
+.Spotlight-V100
+.Trashes
+.cursor/
+
+# AI agent artifacts
+.claude/
+AGENT_AUDIT_REPORT.md
+AUDIT.md
+
+# Logs and debug
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Test and coverage
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
+# Caches
+.turbo/
+.eslintcache
+.stylelintcache
+.parcel-cache
+.cache/
+
+# Backup and temp
+*.bak
+*.backup
+.tmp/
+.temp/
+tmp/
+temp/
+
+# PWA / optional
+*.webmanifest.bak
+
+# Ralph Audit / Fixes (moved under docs/audit, docs/fixes)
+docs/audit/*.log
+docs/fixes/*.log
+docs/audit/.last-message.md
+docs/audit/.last-story
+docs/audit/.model-check.log
+docs/audit/.prompt.md
+docs/audit/.story-attempts
+docs/audit/run.log
+docs/audit/events.log
+docs/fixes/.last-message.md
+docs/fixes/.last-story
+docs/fixes/.model-check.log
+docs/fixes/.prompt.md
+docs/fixes/.story-attempts
+docs/fixes/run.log
+docs/fixes/events.log

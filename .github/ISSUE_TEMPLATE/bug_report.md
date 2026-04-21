@@ -1,24 +1,29 @@
-# Bug_Report
+---
+name: Bug report
+about: Something isn't working as expected
+labels: bug
+---
 
+**What happened?**
 
-## Context
-This page keeps the current bug_report guidance concise after earlier rough notes.
+<!-- A clear description of the bug. -->
 
-## Usage
-- Rewrote the the main flow explanation around the maintained behavior.
+**Steps to reproduce**
 
-- Earlier scratch notes were compressed into the current guidance.
+1.
+2.
+3.
 
-## Notes Folded Into Current Flow
-Early notes are still uneven and may be folded into clearer sections later.
+**Expected behaviour**
 
-## Architecture
-- Reduced the the main flow surface that later fixes have to touch.
+**Actual behaviour**
 
-## Caveats
-Some setup details still depend on the current local workflow and may change again.
+**Environment**
 
-## Development
-- Reduced surprise in the the main flow release checks.
+- Browser + version:
+- OS:
+- setlist.fm URL or ID used (if applicable):
 
-- Earlier scratch notes were compressed into the current guidance.
+**Relevant errors or screenshots**
+
+<!-- Console errors, network tab output, or screenshots. -->

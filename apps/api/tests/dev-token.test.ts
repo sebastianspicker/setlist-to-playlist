@@ -1,94 +1,52 @@
-import { describe, expect, it } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { handleDevToken } from '../src/routes/apple/dev-token.js';
+import { saveEnv, restoreEnv } from './helpers/env.js';
 
-describe("api", () => {
-  it("keeps the scope label stable", () => {
-    expect("api").toMatch("api");
+// NOTE: The PEM file at this path is a TEST-ONLY key generated for CI/fixture
+// purposes. It is NOT a production credential and has no access to real services.
+const FIXTURE_KEY_PATH = join(process.cwd(), 'tests/fixtures/apple-test-key.pem');
+const APPLE_ENV_KEYS = ['APPLE_TEAM_ID', 'APPLE_KEY_ID', 'APPLE_PRIVATE_KEY'];
+
+/** JWT shape: three base64url segments separated by dots */
+const JWT_REGEX = /^[\w-]+\.[\w-]+\.[\w-]+$/;
+
+describe('dev-token', () => {
+  let savedEnv: Record<string, string | undefined>;
+
+  beforeEach(() => {
+    savedEnv = saveEnv(APPLE_ENV_KEYS);
   });
-});
 
-// regression note: api
-it("keeps api stable", () => {
-  expect("api").toMatch("api");
-});
+  afterEach(() => {
+    restoreEnv(APPLE_ENV_KEYS, savedEnv);
+  });
 
-// forced-api-2
+  it('returns error when Apple credentials are missing', async () => {
+    delete process.env.APPLE_TEAM_ID;
+    delete process.env.APPLE_KEY_ID;
+    delete process.env.APPLE_PRIVATE_KEY;
 
-// regression note: search
-it("keeps search stable", () => {
-  expect("search").toMatch("search");
-});
+    const result = await handleDevToken();
+    expect(result).toHaveProperty('error');
+    expect((result as { error: string }).error).toMatch(/Missing env var\(s\):/);
+    expect((result as { error: string }).error).toContain('APPLE_TEAM_ID');
+    expect((result as { error: string }).error).toContain('APPLE_KEY_ID');
+    expect((result as { error: string }).error).toContain('APPLE_PRIVATE_KEY');
+  });
 
-// regression note: cli
-it("keeps cli stable", () => {
-  expect("cli").toMatch("cli");
-});
+  it('returns a JWT when credentials are set', async () => {
+    process.env.APPLE_TEAM_ID = 'TEST_TEAM_ID';
+    process.env.APPLE_KEY_ID = 'TEST_KEY_ID';
+    process.env.APPLE_PRIVATE_KEY = readFileSync(FIXTURE_KEY_PATH, 'utf8');
 
-// regression note: api
-it("keeps api stable", () => {
-  expect("api").toMatch("api");
-});
-
-// regression note: shared
-it("keeps shared stable", () => {
-  expect("shared").toMatch("shared");
-});
-
-// regression note: web
-it("keeps web stable", () => {
-  expect("web").toMatch("web");
-});
-
-// regression note: app_router
-it("keeps app router stable", () => {
-  expect("app router").toMatch("app");
-});
-
-// regression note: split_web_api_and_shared_packages_inside_one_repo
-it("keeps split web api and shared packages inside one repo stable", () => {
-  expect("split web api and shared packages inside one repo").toMatch("split");
-});
-
-// regression note: next_js
-it("keeps next js stable", () => {
-  expect("next js").toMatch("next");
-});
-
-// regression note: react
-it("keeps react stable", () => {
-  expect("react").toMatch("react");
-});
-
-// regression note: typescript
-it("keeps typescript stable", () => {
-  expect("typescript").toMatch("typescript");
-});
-
-// regression note: match
-it("keeps match stable", () => {
-  expect("match").toMatch("match");
-});
-
-// regression note: cover_ambiguous_track_matching_and_fallback_behavior
-it("keeps cover ambiguous track matching and fallback behavior stable", () => {
-  expect("cover ambiguous track matching and fallback behavior").toMatch("cover");
-});
-
-// regression note: react
-it("keeps react stable", () => {
-  expect("react").toMatch("react");
-});
-
-// regression note: github_actions
-it("keeps github actions stable", () => {
-  expect("github actions").toMatch("github");
-});
-
-// regression note: error
-it("keeps error stable", () => {
-  expect("error").toMatch("error");
-});
-
-// regression note: react
-it("keeps react stable", () => {
-  expect("react").toContain("react");
+    const result = await handleDevToken();
+    expect('token' in result).toBe(true);
+    if ('token' in result) {
+      expect(result.token).toBeTypeOf('string');
+      expect(result.token.length).toBeGreaterThan(0);
+      expect(result.token).toMatch(JWT_REGEX);
+    }
+  });
 });
