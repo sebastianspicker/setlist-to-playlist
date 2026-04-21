@@ -46,13 +46,12 @@ describe('mapSetlistFmToSetlist', () => {
     expect(result.eventDate).toBe('23-08-1964');
   });
 
-  it('preserves set structure and track order', () => {
+  it('preserves set structure and track order for playable songs', () => {
     const result = mapSetlistFmToSetlist(fixture);
     expect(result.sets).toHaveLength(2);
-    expect(result.sets[0]).toHaveLength(2);
+    expect(result.sets[0]).toHaveLength(1);
     expect(result.sets[0][0].name).toBe('Yesterday');
     expect(result.sets[0][0].artist).toBe('The Beatles');
-    expect(result.sets[0][1].name).toBe('Help! (live)');
     expect(result.sets[1]).toHaveLength(1);
     expect(result.sets[1][0].name).toBe('Twist and Shout');
   });

@@ -25,6 +25,16 @@ describe('CSP middleware', () => {
     expect(csp).toContain('https://js-cdn.music.apple.com');
   });
 
+  it('CSP uses a nonce instead of unsafe-inline for scripts', () => {
+    const headers = getHeaders();
+    const nonce = headers.get('x-nonce');
+    const csp = headers.get('Content-Security-Policy')!;
+
+    expect(nonce).toBeTruthy();
+    expect(csp).toContain(`'nonce-${nonce}'`);
+    expect(csp).not.toContain("script-src 'self' 'unsafe-inline'");
+  });
+
   it('CSP allows Apple Music API in connect-src', () => {
     const csp = getHeaders().get('Content-Security-Policy')!;
     expect(csp).toContain('https://api.music.apple.com');

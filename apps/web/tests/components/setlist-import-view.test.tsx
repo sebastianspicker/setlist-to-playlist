@@ -12,16 +12,20 @@ vi.mock('../../src/components/ErrorAlert', () => ({
     React.createElement('div', { role: 'alert' }, message),
 }));
 vi.mock('../../src/components/LoadingButton', () => ({
-  LoadingButton: (
-    props: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-      loading?: boolean;
-      loadingChildren?: string;
-    }
-  ) =>
+  LoadingButton: ({
+    loading,
+    loadingChildren,
+    children,
+    disabled,
+    ...buttonProps
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    loading?: boolean;
+    loadingChildren?: string;
+  }) =>
     React.createElement(
       'button',
-      { ...props, disabled: props.disabled || props.loading },
-      props.loading ? props.loadingChildren : props.children
+      { ...buttonProps, disabled: disabled || loading },
+      loading ? loadingChildren : children
     ),
 }));
 vi.mock('../../src/components/SectionTitle', () => ({

@@ -12,9 +12,11 @@ import {
 import type { Setlist } from '@repo/core';
 
 interface ResumeState {
+  status: 'incomplete';
   id: string;
   url?: string;
   remainingIds: string[];
+  selectionSignature: string;
   storedAt?: number;
 }
 
@@ -28,11 +30,33 @@ function readResume(setlistId: string): ResumeState | null {
     const raw = window.sessionStorage.getItem(resumeKey(setlistId));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as ResumeState;
-    if (!parsed?.id || !Array.isArray(parsed?.remainingIds)) return null;
+    if (
+      parsed?.status !== 'incomplete' ||
+      !parsed.id ||
+      typeof parsed.selectionSignature !== 'string' ||
+      !Array.isArray(parsed.remainingIds)
+    ) {
+      return null;
+    }
     return parsed;
   } catch {
     return null;
   }
+}
+
+function createSelectionSignature(songIds: string[], dedupeTracks: boolean): string {
+  return JSON.stringify({ dedupeTracks, songIds });
+}
+
+function getRemainingIds(error: unknown, fallback: string[]): string[] {
+  const remainingIds = (error as { remainingIds?: unknown } | null)?.remainingIds;
+  if (
+    Array.isArray(remainingIds) &&
+    remainingIds.every((id) => typeof id === 'string' && id.trim().length > 0)
+  ) {
+    return remainingIds;
+  }
+  return fallback;
 }
 
 function writeResume(setlistId: string, value: ResumeState | null): void {
@@ -82,22 +106,6 @@ export function useCreatePlaylistState({
   const [dedupeTracks, setDedupeTracks] = useState(false);
   const [resumeState, setResumeState] = useState<ResumeState | null>(null);
 
-  useEffect(() => {
-    const stored = readResume(setlist.id);
-    if (stored) {
-      const STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
-      const storedAt = (stored as ResumeState & { storedAt?: number }).storedAt;
-      if (typeof storedAt === 'number' && Date.now() - storedAt > STALE_THRESHOLD_MS) {
-        writeResume(setlist.id, null);
-        setResumeState(null);
-      } else {
-        setResumeState(stored);
-      }
-    } else {
-      setResumeState(null);
-    }
-  }, [setlist.id]);
-
   const selectedSongIds = useMemo(
     () => matchRows.map((r) => r.appleTrack?.id).filter(Boolean) as string[],
     [matchRows]
@@ -107,6 +115,29 @@ export function useCreatePlaylistState({
     () => (dedupeTracks ? dedupeTrackIdsOrdered(selectedSongIds) : selectedSongIds),
     [dedupeTracks, selectedSongIds]
   );
+
+  const selectionSignature = useMemo(
+    () => createSelectionSignature(songIds, dedupeTracks),
+    [dedupeTracks, songIds]
+  );
+
+  useEffect(() => {
+    const stored = readResume(setlist.id);
+    if (stored) {
+      const STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+      const storedAt = (stored as ResumeState & { storedAt?: number }).storedAt;
+      const isStale = typeof storedAt === 'number' && Date.now() - storedAt > STALE_THRESHOLD_MS;
+      const isMismatched = stored.selectionSignature !== selectionSignature;
+      if (isStale || isMismatched || stored.remainingIds.length === 0) {
+        writeResume(setlist.id, null);
+        setResumeState(null);
+      } else {
+        setResumeState(stored);
+      }
+    } else {
+      setResumeState(null);
+    }
+  }, [selectionSignature, setlist.id]);
 
   async function handleCreate() {
     setError(null);
@@ -134,7 +165,14 @@ export function useCreatePlaylistState({
         setResumeState(null);
         writeResume(setlist.id, null);
       } catch (addErr) {
-        const resume: ResumeState = { id, url, remainingIds: [...songIds], storedAt: Date.now() };
+        const resume: ResumeState = {
+          status: 'incomplete',
+          id,
+          url,
+          remainingIds: getRemainingIds(addErr, songIds),
+          selectionSignature,
+          storedAt: Date.now(),
+        };
         setResumeState(resume);
         writeResume(setlist.id, resume);
         setAddTracksError(getErrorMessage(addErr, 'Adding tracks failed.'));
@@ -158,6 +196,14 @@ export function useCreatePlaylistState({
       writeResume(setlist.id, null);
       setAddTracksError(null);
     } catch (err) {
+      const nextResume: ResumeState = {
+        ...resumeState,
+        remainingIds: getRemainingIds(err, resumeState.remainingIds),
+        selectionSignature,
+        storedAt: Date.now(),
+      };
+      setResumeState(nextResume);
+      writeResume(setlist.id, nextResume);
       setAddTracksError(getErrorMessage(err, 'Adding tracks failed.'));
     } finally {
       setLoading(false);

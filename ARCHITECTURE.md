@@ -8,24 +8,33 @@ Import a setlist from setlist.fm (URL or ID) → preview and optionally correct 
 
 In this repo, the **web app** (Next.js) serves both the PWA and the API. The API is implemented as Next.js Route Handlers under `apps/web/src/app/api/`, which delegate to the shared logic in the `api` package (JWT signing, setlist proxy). There is no separate API server for local development or default deployment.
 
-## Components and Data Flow (ASCII)
+## Components and Data Flow
 
-```
-+------------------+     +------------------+
-|   PWA (Next.js)  |     |   External       |
-|   - Import UI    |     |   - Apple Music  |
-|   - Matching UI  |---->|     API          |
-|   - Export UI    |     |   - setlist.fm   |
-|   - MusicKit JS  |     |     API          |
-|   - /api/*       |---->|                  |
-|     dev-token    |     +------------------+
-|     setlist/proxy|              ^
-|     health       |              |
-+------------------+              |
-        |                  setlist.fm API key
-        |                  (server-side only)
-        +--------------------------+
-                  MusicKit: User token + Dev token
+```mermaid
+graph LR
+    subgraph Browser
+        UI["PWA (Next.js)<br/>Import / Match / Export UI<br/>MusicKit JS"]
+    end
+
+    subgraph "Next.js API Routes (/api/*)"
+        DT["/api/apple/dev-token<br/>(JWT signing)"]
+        SP["/api/setlist/proxy<br/>(setlist.fm proxy)"]
+        H["/api/health"]
+    end
+
+    subgraph External
+        AM["Apple Music API"]
+        SL["setlist.fm API"]
+    end
+
+    UI -- "1 · fetch dev-token" --> DT
+    DT -- "ES256 JWT (1 h)" --> UI
+    UI -- "2 · proxy?id=..." --> SP
+    SP -- "x-api-key (server-side only)" --> SL
+    SL -- "setlist JSON" --> SP
+    SP -- "setlist JSON" --> UI
+    UI -- "3 · MusicKit catalog search<br/>(dev token + storefront)" --> AM
+    UI -- "4 · MusicKit create playlist<br/>(user token)" --> AM
 ```
 
 ## Flows
@@ -33,6 +42,43 @@ In this repo, the **web app** (Next.js) serves both the PWA and the API. The API
 1. **Import:** User enters setlist.fm URL or setlist ID → frontend calls our API proxy (`/api/setlist/proxy`) → proxy validates the ID and calls setlist.fm server-side (API key never leaves the server) → setlist data (artist, venue, date, tracks) is shown.
 2. **Matching:** For each setlist entry, we derive a search query (track + artist, normalized). Apple Music search is done via MusicKit in the client (using our Developer Token from the API). User can correct or re-search.
 3. **Export:** User confirms → MusicKit creates a playlist and adds the selected Apple Music track IDs in order.
+
+### Main User Flow (Sequence)
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant App as PWA (Browser)
+    participant API as Next.js API Routes
+    participant SLfm as setlist.fm API
+    participant AM as Apple Music API
+
+    User->>App: Paste setlist URL or ID
+    App->>API: GET /api/apple/dev-token
+    API-->>App: ES256 JWT (1 h, signed server-side)
+
+    App->>API: GET /api/setlist/proxy?id=<id>
+    API->>SLfm: GET /rest/1.0/setlist/<id> (x-api-key, server-side)
+    SLfm-->>API: Setlist JSON
+    API-->>App: Setlist JSON (cached 1 h)
+
+    App->>User: Preview — artist, venue, date, tracks
+
+    loop For each track (batches of 5)
+        App->>AM: MusicKit catalog search (dev token)
+        AM-->>App: Suggested Apple Music track
+    end
+
+    App->>User: Matching screen — review & correct
+
+    User->>App: "Create Playlist"
+    App->>AM: MusicKit.authorize() → user token
+    App->>AM: POST /v1/me/library/playlists (user token)
+    AM-->>App: Playlist ID
+    App->>AM: POST /v1/me/library/playlists/<id>/tracks
+    AM-->>App: 204 No Content
+    App->>User: ✅ Playlist created
+```
 
 ## Token Handling
 

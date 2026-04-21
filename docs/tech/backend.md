@@ -24,7 +24,7 @@ Business logic lives in the `api` package (`apps/api`); the Next.js routes impor
 
 ## Deployment
 
-Deploy the Next.js app (e.g. Vercel, Netlify). The same deployment serves pages and API routes. Set env vars (`APPLE_*`, `SETLISTFM_API_KEY`, `ALLOWED_ORIGIN`, etc.) in the deployment environment.
+Deploy the Next.js app as one self-hosted Node.js service behind a reverse proxy. The same deployment serves pages and API routes. Set env vars (`APPLE_*`, `SETLISTFM_API_KEY`, `ALLOWED_ORIGIN`, etc.) in the deployment environment.
 
 ---
 

@@ -95,7 +95,7 @@ describe('MatchingView', () => {
       skipUnmatched: vi.fn(),
     });
     render(<MatchingView setlist={mockSetlist} onProceedToCreatePlaylist={vi.fn()} />);
-    expect(screen.getByText('Fetching suggestions…')).toBeInTheDocument();
+    expect(screen.getByText('Searching Apple Music for matching songs…')).toBeInTheDocument();
   });
 
   it('disables proceed button when no tracks matched', () => {

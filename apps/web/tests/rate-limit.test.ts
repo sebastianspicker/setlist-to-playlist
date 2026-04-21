@@ -128,15 +128,26 @@ describe('createInMemoryRateLimiter', () => {
 });
 
 describe('extractClientKeyFromHeaders', () => {
-  it('uses first x-forwarded-for value', () => {
+  it('uses first x-forwarded-for value when TRUST_PROXY=1', () => {
+    vi.stubEnv('TRUST_PROXY', '1');
     const headers = new Headers({
       'x-forwarded-for': '1.1.1.1, 2.2.2.2',
     });
     expect(extractClientKeyFromHeaders(headers)).toBe('1.1.1.1');
   });
 
-  it('falls back to x-real-ip and fallback', () => {
+  it('falls back to x-real-ip and fallback when TRUST_PROXY=1', () => {
+    vi.stubEnv('TRUST_PROXY', '1');
     expect(extractClientKeyFromHeaders(new Headers({ 'x-real-ip': '3.3.3.3' }))).toBe('3.3.3.3');
     expect(extractClientKeyFromHeaders(new Headers(), 'fallback-key')).toBe('fallback-key');
+  });
+
+  it('ignores forwarded IP headers when TRUST_PROXY is unset', () => {
+    vi.unstubAllEnvs();
+    const headers = new Headers({
+      'x-forwarded-for': '1.1.1.1, 2.2.2.2',
+      'x-real-ip': '3.3.3.3',
+    });
+    expect(extractClientKeyFromHeaders(headers, 'fallback-key')).toBe('fallback-key');
   });
 });

@@ -84,12 +84,7 @@ describe('handleSetlistProxy', () => {
     };
     vi.stubGlobal(
       'fetch',
-      vi.fn(() =>
-        Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockSetlist),
-        } as Response)
-      )
+      vi.fn(() => Promise.resolve(new Response(JSON.stringify(mockSetlist), { status: 200 })))
     );
 
     const result = await handleSetlistProxy('63de4613');

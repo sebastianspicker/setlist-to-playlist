@@ -13,7 +13,11 @@ vi.mock('../src/lib/musickit/client', () => ({
   initMusicKit: vi.fn(() => Promise.resolve(mockMusicKitInstance)),
 }));
 
-import { createLibraryPlaylist, addTracksToLibraryPlaylist } from '../src/lib/musickit/playlist';
+import {
+  createLibraryPlaylist,
+  addTracksToLibraryPlaylist,
+  AddTracksToLibraryPlaylistError,
+} from '../src/lib/musickit/playlist';
 
 describe('createLibraryPlaylist', () => {
   beforeEach(() => {
@@ -80,12 +84,13 @@ describe('addTracksToLibraryPlaylist', () => {
     vi.restoreAllMocks();
   });
 
-  it('success adds tracks without error', async () => {
+  it('success returns full add progress', async () => {
     mockApi.mockResolvedValueOnce({ data: [] });
 
-    await expect(
-      addTracksToLibraryPlaylist('pl-123', ['song-1', 'song-2'])
-    ).resolves.toBeUndefined();
+    await expect(addTracksToLibraryPlaylist('pl-123', ['song-1', 'song-2'])).resolves.toEqual({
+      addedIds: ['song-1', 'song-2'],
+      remainingIds: [],
+    });
 
     expect(mockApi).toHaveBeenCalledTimes(1);
     expect(mockApi).toHaveBeenCalledWith('/v1/me/library/playlists/pl-123/tracks', {
@@ -109,7 +114,10 @@ describe('addTracksToLibraryPlaylist', () => {
   });
 
   it('empty songIds does nothing', async () => {
-    await expect(addTracksToLibraryPlaylist('pl-123', [])).resolves.toBeUndefined();
+    await expect(addTracksToLibraryPlaylist('pl-123', [])).resolves.toEqual({
+      addedIds: [],
+      remainingIds: [],
+    });
     expect(mockApi).not.toHaveBeenCalled();
   });
 
@@ -132,7 +140,12 @@ describe('addTracksToLibraryPlaylist', () => {
   it('filters out invalid IDs and sends only valid ones', async () => {
     mockApi.mockResolvedValueOnce(undefined);
 
-    await addTracksToLibraryPlaylist('pl-123', ['', 'song-1', '  ', 'song-2']);
+    await expect(
+      addTracksToLibraryPlaylist('pl-123', ['', 'song-1', '  ', 'song-2'])
+    ).resolves.toEqual({
+      addedIds: ['song-1', 'song-2'],
+      remainingIds: [],
+    });
 
     expect(mockApi).toHaveBeenCalledWith('/v1/me/library/playlists/pl-123/tracks', {
       method: 'POST',
@@ -143,5 +156,24 @@ describe('addTracksToLibraryPlaylist', () => {
         ],
       },
     });
+  });
+
+  it('reports the exact remaining IDs after a later batch fails', async () => {
+    const songIds = Array.from({ length: 250 }, (_, index) => `song-${index + 1}`);
+    mockApi
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({
+        errors: [{ detail: 'Rate limit', status: '429' }],
+      });
+
+    await expect(addTracksToLibraryPlaylist('pl-123', songIds)).rejects.toMatchObject({
+      name: 'AddTracksToLibraryPlaylistError',
+      message: 'Adding tracks to playlist failed: Rate limit',
+      addedIds: songIds.slice(0, 200),
+      remainingIds: songIds.slice(200),
+    } satisfies Partial<AddTracksToLibraryPlaylistError>);
+
+    expect(mockApi).toHaveBeenCalledTimes(3);
   });
 });

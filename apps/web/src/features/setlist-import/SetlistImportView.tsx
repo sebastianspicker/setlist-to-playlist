@@ -144,7 +144,11 @@ export function SetlistImportView() {
           />
           {!error && (
             <p id="setlist-hint" className="input-hint">
-              Example: <code className="accent-inline">https://www.setlist.fm/setlist/radiohead/...63de4613.html</code> or just <code className="accent-inline">63de4613</code>
+              Example:{' '}
+              <code className="accent-inline">
+                https://www.setlist.fm/setlist/radiohead/...63de4613.html
+              </code>{' '}
+              or just <code className="accent-inline">63de4613</code>
             </p>
           )}
         </div>

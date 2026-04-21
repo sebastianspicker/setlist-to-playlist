@@ -31,6 +31,7 @@ export function useMatchingSuggestions(setlist: Setlist): UseMatchingSuggestions
   const [suggestionError, setSuggestionError] = useState(false);
   const runIdRef = useRef(0);
   const runIdCounter = useRef(0);
+  const scheduledSignatureRef = useRef<string | null>(null);
 
   const signature = useMemo(() => getSetlistSignature(setlist), [setlist]);
 
@@ -99,7 +100,18 @@ export function useMatchingSuggestions(setlist: Setlist): UseMatchingSuggestions
   }, [setlist]);
 
   useEffect(() => {
-    void autoMatchAll();
+    if (scheduledSignatureRef.current === signature) {
+      return;
+    }
+    scheduledSignatureRef.current = signature;
+
+    const timeoutId = window.setTimeout(() => {
+      void autoMatchAll();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
   }, [signature, autoMatchAll]);
 
   const setMatch = useCallback((index: number, appleTrack: AppleMusicTrack | null) => {

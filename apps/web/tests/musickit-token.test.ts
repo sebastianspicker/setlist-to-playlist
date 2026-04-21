@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { Result } from '@repo/shared';
 
 vi.mock('../src/lib/fetch', () => ({
   fetchJson: vi.fn(),
@@ -65,7 +66,7 @@ describe('fetchDeveloperToken', () => {
   });
 
   it('concurrent calls deduplicate via promise-singleton pattern', async () => {
-    let resolveFetch!: (value: unknown) => void;
+    let resolveFetch!: (value: Result<unknown, string>) => void;
     mockFetchJson.mockImplementation(
       () =>
         new Promise((resolve) => {
