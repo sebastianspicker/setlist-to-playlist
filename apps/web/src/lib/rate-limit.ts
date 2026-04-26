@@ -86,6 +86,26 @@ export function createInMemoryRateLimiter(
   };
 }
 
+const MAX_CLIENT_KEY_LENGTH = 200;
+
+function normalizeClientKeyPart(value: string | null): string {
+  if (!value) return '';
+  return value.trim().toLowerCase().slice(0, 80);
+}
+
+function buildUntrustedFallbackKey(headers: Headers): string {
+  const userAgent = normalizeClientKeyPart(headers.get('user-agent'));
+  const language = normalizeClientKeyPart(headers.get('accept-language'));
+  const origin = normalizeClientKeyPart(headers.get('origin'));
+  const host = normalizeClientKeyPart(headers.get('host'));
+
+  const parts = [userAgent, language, origin, host].filter(Boolean);
+  if (parts.length === 0) return 'unknown';
+
+  const key = `anon:${parts.join('|')}`;
+  return key.length > MAX_CLIENT_KEY_LENGTH ? key.slice(0, MAX_CLIENT_KEY_LENGTH) : key;
+}
+
 /**
  * Extract a client identifier from request headers for rate limiting.
  *
@@ -97,7 +117,8 @@ export function createInMemoryRateLimiter(
 export function extractClientKeyFromHeaders(headers: Headers, fallback = 'unknown'): string {
   const trustProxy = process.env.TRUST_PROXY === '1';
   if (!trustProxy) {
-    return fallback;
+    const derived = buildUntrustedFallbackKey(headers);
+    return derived === 'unknown' ? fallback : derived;
   }
 
   const xff = headers.get('x-forwarded-for');

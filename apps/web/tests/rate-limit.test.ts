@@ -142,12 +142,23 @@ describe('extractClientKeyFromHeaders', () => {
     expect(extractClientKeyFromHeaders(new Headers(), 'fallback-key')).toBe('fallback-key');
   });
 
-  it('ignores forwarded IP headers when TRUST_PROXY is unset', () => {
+  it('uses a derived anonymous key when TRUST_PROXY is unset', () => {
     vi.unstubAllEnvs();
     const headers = new Headers({
       'x-forwarded-for': '1.1.1.1, 2.2.2.2',
       'x-real-ip': '3.3.3.3',
+      'user-agent': 'Mozilla/5.0',
+      'accept-language': 'en-US,en;q=0.9',
+      origin: 'https://example.com',
+      host: 'example.com',
     });
-    expect(extractClientKeyFromHeaders(headers, 'fallback-key')).toBe('fallback-key');
+    expect(extractClientKeyFromHeaders(headers, 'fallback-key')).toBe(
+      'anon:mozilla/5.0|en-us,en;q=0.9|https://example.com|example.com'
+    );
+  });
+
+  it('falls back to explicit fallback when no fingerprint headers are present', () => {
+    vi.unstubAllEnvs();
+    expect(extractClientKeyFromHeaders(new Headers(), 'fallback-key')).toBe('fallback-key');
   });
 });

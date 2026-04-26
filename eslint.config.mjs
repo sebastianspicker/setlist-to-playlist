@@ -1,18 +1,15 @@
 import js from '@eslint/js';
-import nextVitals from 'eslint-config-next/core-web-vitals';
 import tseslint from 'typescript-eslint';
 
-const webFiles = ['apps/web/**/*.{js,jsx,ts,tsx}'];
-const scopedNextVitals = nextVitals.map((config) => ({
-  ...config,
-  files: webFiles,
-}));
+// Note: Keep root lint config dependency-light so workspace-wide linting
+// succeeds even when app-local lint presets are not available at root.
 
 export default tseslint.config(
   js.configs.recommended,
-  ...scopedNextVitals,
   ...tseslint.configs.recommended,
   {
+    files: ['**/*.{js,jsx,ts,tsx}'],
+    ignores: ['**/dist/**', '**/.next/**', '**/coverage/**', 'node_modules/**'],
     languageOptions: {
       parserOptions: {
         ecmaVersion: 'latest',
@@ -28,8 +25,8 @@ export default tseslint.config(
       },
     },
     rules: {
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   }
 );

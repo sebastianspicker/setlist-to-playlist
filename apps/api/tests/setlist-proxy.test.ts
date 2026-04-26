@@ -134,8 +134,35 @@ describe('handleSetlistProxy', () => {
     expect(isErr(result)).toBe(true);
     if (isErr(result)) {
       expect(result.error.status).toBe(429);
-      expect(result.error.error.error).toMatch(/rate limit|too many requests/i);
+      expect(result.error.error.error).toBe(
+        'setlist.fm rate limit exceeded. Please try again in a moment.'
+      );
       expect(result.error.error.code).toBe(API_ERROR.RATE_LIMIT);
+    }
+  });
+
+  it('normalizes upstream 400 errors to a stable client message', async () => {
+    process.env.SETLISTFM_API_KEY = 'test-key';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: false,
+          status: 400,
+          text: () => Promise.resolve('<html>upstream detail</html>'),
+          statusText: 'Bad Request',
+        } as Response)
+      )
+    );
+
+    const result = await handleSetlistProxy('63de4615');
+    expect(isErr(result)).toBe(true);
+    if (isErr(result)) {
+      expect(result.error.status).toBe(400);
+      expect(result.error.error.error).toBe(
+        'Unable to import this setlist. Verify the URL or ID and try again.'
+      );
+      expect(result.error.error.code).toBe(API_ERROR.BAD_REQUEST);
     }
   });
 });
