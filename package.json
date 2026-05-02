@@ -7,9 +7,15 @@
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm --filter @repo/shared run build && pnpm --filter @repo/core run build && pnpm --filter api run build && pnpm --filter web exec tsc --noEmit",
     "test": "pnpm -r run test",
+    "audit:security": "pnpm audit --audit-level=moderate --prod",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
     "cleanup:repo": "bash scripts/cleanup-repo.sh"
+  },
+  "pnpm": {
+    "overrides": {
+      "postcss": "8.5.10"
+    }
   },
   "devDependencies": {
     "@eslint/js": "^9.16.0",
