@@ -34,7 +34,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Dependency audit
-        run: pnpm audit --audit-level=high --prod
+        run: pnpm audit:security
 
       - name: Format check
         run: pnpm format:check

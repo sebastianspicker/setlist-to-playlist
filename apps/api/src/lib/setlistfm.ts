@@ -46,6 +46,7 @@ function setCached(id: string, body: unknown): void {
 
 const MAX_RETRIES_429 = 2;
 const BACKOFF_MS = 1000;
+const MAX_RETRY_AFTER_MS = 5000;
 
 function parseRetryAfterMs(value: string | null): number | null {
   if (!value) return null;
@@ -65,8 +66,10 @@ function getRetryDelayMs(res: Response): number {
   const retryAfterValue =
     typeof res.headers?.get === 'function' ? res.headers.get('retry-after') : null;
   const retryAfterMs = parseRetryAfterMs(retryAfterValue);
+  const boundedRetryAfterMs =
+    retryAfterMs === null ? null : Math.min(retryAfterMs, MAX_RETRY_AFTER_MS);
   const jitterMs = Math.floor(Math.random() * 100);
-  return Math.max(0, retryAfterMs ?? BACKOFF_MS) + jitterMs;
+  return Math.max(0, boundedRetryAfterMs ?? BACKOFF_MS) + jitterMs;
 }
 
 export type FetchSetlistResult =

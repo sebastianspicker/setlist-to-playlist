@@ -10,6 +10,7 @@
 
 - [ ] `pnpm format:check` passes
 - [ ] `pnpm lint` passes
+- [ ] `pnpm audit:security` passes
 - [ ] `pnpm test` passes
 - [ ] `pnpm build` succeeds
 - [ ] Manually verified in browser (if UI change)

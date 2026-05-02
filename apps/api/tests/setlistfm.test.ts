@@ -72,4 +72,39 @@ describe('fetchSetlistFromApi', () => {
       body: { id: '63de1111', artist: { name: 'Band' } },
     });
   });
+
+  it('caps excessive Retry-After values before retrying 429 responses', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        streamResponse(JSON.stringify({ message: 'Too Many Requests' }), {
+          status: 429,
+          headers: { 'Retry-After': '3600', 'Content-Type': 'application/json' },
+        })
+      )
+      .mockResolvedValueOnce(
+        streamResponse(JSON.stringify({ id: '63de2222', artist: { name: 'Band' } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const pending = fetchSetlistFromApi('63de2222', 'test-key');
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    const result = await pending;
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({
+      ok: true,
+      body: { id: '63de2222', artist: { name: 'Band' } },
+    });
+  });
 });
