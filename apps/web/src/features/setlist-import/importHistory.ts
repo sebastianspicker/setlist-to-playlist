@@ -1,8 +1,8 @@
 import { parseSetlistIdFromInput } from '@repo/core';
 
-const HISTORY_V1_KEY = 'setlist_import_history_v1';
-const HISTORY_V2_KEY = 'setlist_import_history_v2';
-const HISTORY_V3_KEY = 'setlist_import_history_v3';
+const HISTORY_V1_STORAGE_ENTRY = 'setlist_import_history_v1';
+const HISTORY_V2_STORAGE_ENTRY = 'setlist_import_history_v2';
+const HISTORY_V3_STORAGE_ENTRY = 'setlist_import_history_v3';
 const MAX_HISTORY_ITEMS = 8;
 
 export interface ImportHistoryItem {
@@ -18,8 +18,8 @@ function isHistoryItem(value: unknown): value is ImportHistoryItem {
 
 function clearLegacyHistory(): void {
   try {
-    window.localStorage.removeItem(HISTORY_V1_KEY);
-    window.localStorage.removeItem(HISTORY_V2_KEY);
+    window.localStorage.removeItem(HISTORY_V1_STORAGE_ENTRY);
+    window.localStorage.removeItem(HISTORY_V2_STORAGE_ENTRY);
   } catch {
     // Migrating legacy history is best effort when storage access is blocked.
   }
@@ -28,9 +28,9 @@ function clearLegacyHistory(): void {
 export function clearImportHistory(): void {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.removeItem(HISTORY_V1_KEY);
-    window.localStorage.removeItem(HISTORY_V2_KEY);
-    window.localStorage.removeItem(HISTORY_V3_KEY);
+    window.localStorage.removeItem(HISTORY_V1_STORAGE_ENTRY);
+    window.localStorage.removeItem(HISTORY_V2_STORAGE_ENTRY);
+    window.localStorage.removeItem(HISTORY_V3_STORAGE_ENTRY);
   } catch {
     // Clearing optional browser history is best effort.
   }
@@ -39,7 +39,10 @@ export function clearImportHistory(): void {
 export function writeImportHistory(next: ImportHistoryItem[]): void {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(HISTORY_V3_KEY, JSON.stringify(next.slice(0, MAX_HISTORY_ITEMS)));
+    window.localStorage.setItem(
+      HISTORY_V3_STORAGE_ENTRY,
+      JSON.stringify(next.slice(0, MAX_HISTORY_ITEMS))
+    );
   } catch {
     // History is optional; storage can be unavailable or full.
   }
@@ -71,42 +74,43 @@ function migrateV1History(raw: string): ImportHistoryItem[] | null {
     .slice(0, MAX_HISTORY_ITEMS);
 }
 
+function readV3History(raw: string): ImportHistoryItem[] {
+  const parsed = parseHistoryArray(raw);
+  if (!parsed) {
+    clearImportHistory();
+    return [];
+  }
+  clearLegacyHistory();
+  return parsed.filter(isHistoryItem).slice(0, MAX_HISTORY_ITEMS);
+}
+
+function readMigratedHistory(raw: string, migrate: (value: string) => ImportHistoryItem[] | null) {
+  const migrated = migrate(raw);
+  if (!migrated) {
+    clearLegacyHistory();
+    return [];
+  }
+  writeImportHistory(migrated);
+  clearLegacyHistory();
+  return migrated;
+}
+
 export function readImportHistory(): ImportHistoryItem[] {
   if (typeof window === 'undefined') return [];
   try {
-    const v3Raw = window.localStorage.getItem(HISTORY_V3_KEY);
+    const v3Raw = window.localStorage.getItem(HISTORY_V3_STORAGE_ENTRY);
     if (v3Raw) {
-      const parsed = parseHistoryArray(v3Raw);
-      if (!parsed) {
-        clearImportHistory();
-        return [];
-      }
-      clearLegacyHistory();
-      return parsed.filter(isHistoryItem).slice(0, MAX_HISTORY_ITEMS);
+      return readV3History(v3Raw);
     }
 
-    const v2Raw = window.localStorage.getItem(HISTORY_V2_KEY);
+    const v2Raw = window.localStorage.getItem(HISTORY_V2_STORAGE_ENTRY);
     if (v2Raw) {
-      const migrated = migrateV2History(v2Raw);
-      if (!migrated) {
-        clearLegacyHistory();
-        return [];
-      }
-      writeImportHistory(migrated);
-      clearLegacyHistory();
-      return migrated;
+      return readMigratedHistory(v2Raw, migrateV2History);
     }
 
-    const v1Raw = window.localStorage.getItem(HISTORY_V1_KEY);
+    const v1Raw = window.localStorage.getItem(HISTORY_V1_STORAGE_ENTRY);
     if (!v1Raw) return [];
-    const migrated = migrateV1History(v1Raw);
-    if (!migrated) {
-      clearLegacyHistory();
-      return [];
-    }
-    writeImportHistory(migrated);
-    clearLegacyHistory();
-    return migrated;
+    return readMigratedHistory(v1Raw, migrateV1History);
   } catch {
     clearImportHistory();
     return [];

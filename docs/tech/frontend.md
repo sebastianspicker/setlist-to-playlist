@@ -3,7 +3,7 @@
 ## Stack
 
 The web application uses Next.js 16 App Router, React 19, and TypeScript.
-`apps/web/src/app/page.tsx` renders the interactive `SetlistImportView`.
+`apps/web/src/app/page.tsx` renders the interactive `SetlistImportWorkflow`.
 
 ## Routes
 

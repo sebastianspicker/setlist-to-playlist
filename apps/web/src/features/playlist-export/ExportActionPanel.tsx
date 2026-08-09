@@ -2,7 +2,7 @@
 
 import { Button } from '@repo/ui';
 import { ErrorAlert } from '@/components/ErrorAlert';
-import { ConnectAppleMusic } from '@/features/matching/ConnectAppleMusic';
+import { AppleMusicAuthorization } from '@/features/matching/AppleMusicAuthorization';
 
 export interface ExportActionPanelProps {
   needsAuth: boolean;
@@ -34,36 +34,27 @@ function MutationNote() {
 }
 
 export function ExportActionPanel(props: ExportActionPanelProps) {
-  const {
-    needsAuth,
-    dedupeTracks,
-    setDedupeTracks,
-    dedupeSavings,
-    count,
-    loading,
-    error,
-    onCreate,
-    onAuthorized,
-  } = props;
   return (
     <section className="export-action-panel" aria-label="Apple Music playlist creation">
       <p className="export-service">Apple Music</p>
       <div className="connection-status">
         <span className="connection-status__label">Connection</span>
-        <strong>{needsAuth ? 'Not connected' : 'Connected'}</strong>
+        <strong>{props.needsAuth ? 'Not connected' : 'Connected'}</strong>
       </div>
 
       <label className="checkbox-row">
         <input
           type="checkbox"
-          checked={dedupeTracks}
-          onChange={(event) => setDedupeTracks(event.target.checked)}
+          checked={props.dedupeTracks}
+          onChange={(event) => {
+            props.setDedupeTracks(event.target.checked);
+          }}
         />
         <span>
           <strong>Remove duplicate songs</strong>
           <small>
-            {dedupeTracks && dedupeSavings > 0
-              ? `${dedupeSavings} duplicate song${dedupeSavings === 1 ? '' : 's'} will be removed.`
+            {props.dedupeTracks && props.dedupeSavings > 0
+              ? `${props.dedupeSavings} duplicate song${props.dedupeSavings === 1 ? '' : 's'} will be removed.`
               : 'No duplicates found in the current selection.'}
           </small>
         </span>
@@ -71,16 +62,16 @@ export function ExportActionPanel(props: ExportActionPanelProps) {
 
       <MutationNote />
 
-      {needsAuth ? (
-        <ConnectAppleMusic
-          onAuthorized={onAuthorized}
+      {props.needsAuth ? (
+        <AppleMusicAuthorization
+          onAuthorized={props.onAuthorized}
           label="Connect Apple Music and create playlist"
         />
       ) : (
         <Button
-          onClick={onCreate}
-          disabled={count === 0}
-          loading={loading}
+          onClick={props.onCreate}
+          disabled={props.count === 0}
+          loading={props.loading}
           loadingChildren="Creating playlist…"
           className="export-create"
         >
@@ -88,11 +79,11 @@ export function ExportActionPanel(props: ExportActionPanelProps) {
         </Button>
       )}
 
-      {error ? (
+      {props.error ? (
         <ErrorAlert
-          message={error}
+          message={props.error}
           onRetry={() => {
-            onCreate();
+            props.onCreate();
           }}
           retryLabel="Retry create playlist"
         />

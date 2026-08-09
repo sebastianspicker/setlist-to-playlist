@@ -52,10 +52,13 @@ Thumbs.db
 /.agents/
 /.codex/
 /.codacy/
+/.codacy.yaml
 /.codegraph/
 /.impeccable/
 /.serena/
 /.prompts/
+/.mcp.json
+/.repowise/
 /AGENTS.md
 /AGENT_*.md
 /AGENT_AUDIT_REPORT.md

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { fetchSetlistFromApi } from '../src/lib/setlistfm.js';
+import { getRetryDelayMs } from '../src/lib/setlistfm-retry.js';
 
 function streamResponse(
   body: string,
@@ -105,6 +106,12 @@ describe('fetchSetlistFromApi', () => {
       ok: true,
       body: validSetlistBody('63de1111'),
     });
+  });
+
+  it('adds bounded jitter to the default retry delay', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+    expect(getRetryDelayMs(new Response(null, { status: 429 }))).toBe(1050);
   });
 
   it('caps huge numeric Retry-After values before retrying', async () => {

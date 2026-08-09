@@ -21,6 +21,21 @@ async function loadFixtureSetlist(page: import('@playwright/test').Page) {
   );
 }
 
+test('hydrates persisted import history without a runtime error', async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'setlist_import_history_v3',
+      JSON.stringify([{ input: '63de4613', setlistId: '63de4613' }])
+    );
+  });
+
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Recent imports' })).toBeVisible();
+  expect(pageErrors).toEqual([]);
+});
+
 test('imports, matches, manually changes, and exports a playlist @screenshots', async ({
   page,
 }, testInfo) => {

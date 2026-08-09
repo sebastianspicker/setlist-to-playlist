@@ -49,23 +49,23 @@ published.
 
 ## 0.2.1, 2026-03-22
 
-### Added
+### 0.2.1 Added
 
 - React Testing Library, jsdom, component tests, and CSP middleware tests.
 
-### Fixed
+### 0.2.1 Fixed
 
 - Accessible search-result names and dynamic loading status text.
 - MusicKit initialization timeout settlement and development-only error logging.
 
 ## 0.2.0, 2026-03-22
 
-### Added
+### 0.2.0 Added
 
 - Content Security Policy and browser security headers.
 - MusicKit client integration tests.
 
-### Fixed
+### 0.2.0 Fixed
 
 - Export resume writes now tolerate unavailable browser storage.
 - Playlist response handling uses a declared MusicKit response type.

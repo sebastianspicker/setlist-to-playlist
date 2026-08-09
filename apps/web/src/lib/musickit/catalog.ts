@@ -19,8 +19,8 @@ function evictSearchCache(): void {
   if (searchCache.size > SEARCH_CACHE_MAX_SIZE) {
     const entries = [...searchCache.entries()].sort((a, b) => a[1].expires - b[1].expires);
     const deleteCount = Math.ceil(entries.length * 0.2);
-    for (let i = 0; i < deleteCount; i++) {
-      searchCache.delete(entries[i]![0]);
+    for (const [key] of entries.slice(0, deleteCount)) {
+      searchCache.delete(key);
     }
   }
 }

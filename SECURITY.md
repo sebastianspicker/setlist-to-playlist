@@ -8,7 +8,7 @@ snapshots are unsupported.
 ## Reporting a vulnerability
 
 Use a
-[private GitHub security advisory](https://github.com/sebastianspicker/setlist-to-playlist/security/advisories/new).
+[private GitHub security advisory](https://github.com/sebastianspicker/showtape/security/advisories/new).
 Do not open a public issue for a vulnerability, exposed credential, or private
 user data.
 
@@ -35,6 +35,14 @@ time commitments.
   key markers, local tool state, reports, and absolute home paths.
 - `corepack pnpm@9.15.3 audit:security` checks production dependencies at
   moderate severity or higher.
+
+## CI dependency integrity
+
+Every third-party GitHub Action is pinned to a reviewed full commit SHA, with
+the corresponding release version retained as a comment in the workflow.
+Action updates require reviewing the upstream release and changing the SHA and
+version comment together. The public-boundary check rejects mutable action
+references.
 
 Operators are responsible for TLS, secret storage, proxy configuration, access
 logs, monitoring, backups, and incident response.
