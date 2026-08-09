@@ -62,6 +62,7 @@ Thumbs.db
 /AGENTS.md
 /AGENT_*.md
 /AGENT_AUDIT_REPORT.md
+/AUDIT_LEDGER.md
 /AUDIT*.md
 /FINDINGS*.md
 /REVIEW*.md
@@ -69,6 +70,8 @@ Thumbs.db
 /RELEASE_STATUS.md
 /reports/
 /scratch/
+/wip/
+/work-in-progress/
 /deprecated/
 /local/
 /report.json
