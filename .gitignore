@@ -133,4 +133,5 @@ tmp/
 temp/
 
 # PWA / optional
+/docs/agent/
 *.webmanifest.bak
