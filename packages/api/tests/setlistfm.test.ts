@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { fetchSetlistFromApi } from '../src/lib/setlistfm.js';
+import { getRetryDelayMs } from '../src/lib/setlistfm-retry.js';
 
 function streamResponse(
   body: string,
@@ -44,6 +45,32 @@ describe('fetchSetlistFromApi', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.useRealTimers();
+  });
+
+  it('does not follow upstream redirects with the API credential', async () => {
+    const redirectTarget = 'https://untrusted.example/collect';
+    const fetchMock = vi.fn().mockResolvedValue(
+      streamResponse(JSON.stringify({ message: 'Moved temporarily' }), {
+        status: 302,
+        headers: { Location: redirectTarget },
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchSetlistFromApi('63de0000', 'test-key')).resolves.toEqual({
+      ok: false,
+      status: 502,
+      message: 'Invalid setlist.fm upstream redirect.',
+    });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(URL),
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'x-api-key': 'test-key' }),
+        redirect: 'manual',
+      })
+    );
   });
 
   it('rejects oversized streamed upstream responses without Content-Length', async () => {
@@ -105,6 +132,12 @@ describe('fetchSetlistFromApi', () => {
       ok: true,
       body: validSetlistBody('63de1111'),
     });
+  });
+
+  it('adds bounded jitter to the default retry delay', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+    expect(getRetryDelayMs(new Response(null, { status: 429 }))).toBe(1050);
   });
 
   it('caps huge numeric Retry-After values before retrying', async () => {

@@ -28,6 +28,17 @@ const addTrackBatch = async (
     | MusicKitAddTracksResponse
     | undefined;
 
+function validatedTrackIds(playlistId: string, songIds: string[]): string[] {
+  if (!playlistId.trim()) {
+    throw new Error('Invalid playlist ID');
+  }
+  const validIds = songIds.filter((id) => typeof id === 'string' && id.trim().length > 0);
+  if (validIds.length === 0) {
+    throw new Error('No valid song IDs to add');
+  }
+  return validIds;
+}
+
 export class AmbiguousMusicMutationError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
     super(message, options);
@@ -105,13 +116,7 @@ export async function addTracksToLibraryPlaylist(
   if (songIds.length === 0) {
     return { addedIds: [], remainingIds: [] };
   }
-  if (!playlistId?.trim()) {
-    throw new Error('Invalid playlist ID');
-  }
-  const validIds = songIds.filter((id) => typeof id === 'string' && id.trim().length > 0);
-  if (validIds.length === 0) {
-    throw new Error('No valid song IDs to add');
-  }
+  const validIds = validatedTrackIds(playlistId, songIds);
   const music = await initMusicKit();
   if (!music.isAuthorized) {
     throw new Error('Not authorized. Please connect Apple Music first.');

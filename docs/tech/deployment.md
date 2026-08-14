@@ -1,6 +1,31 @@
 # Deployment
 
-## Supported process
+## Host-owned GitHub Pages static demo
+
+GitHub Pages hosts only the sanitized, local-only workflow demo. It does not run
+the Next.js application, call Showtape API routes, connect to MusicKit, or create
+an Apple Music playlist.
+
+Build and validate the exact Pages artifact locally:
+
+```bash
+corepack pnpm@9.15.3 demo:check
+corepack pnpm@9.15.3 demo:build
+```
+
+The ignored output is `dist/pages`. Showtape intentionally does not own a Pages
+deployment workflow. The established `sebastianspicker.github.io` workflow is
+the sole deployer: it checks out a reviewed, immutable Showtape commit, runs the
+same validation and build, and stages the artifact at `public/showtape` only
+after Hugo's final clean build. The host then uploads one combined Pages
+artifact.
+
+Pushing Showtape does not publish the demo by itself. After a source revision is
+reviewed and available remotely, advance `SHOWTAPE_REF` in the host workflow to
+that full commit ID and validate the combined host artifact before deployment.
+No application credentials are required by the static build or staging step.
+
+## Supported live application process
 
 One self-hosted Next.js process serves the browser application and all API
 routes.
@@ -12,7 +37,8 @@ corepack pnpm@9.15.3 --filter web start
 ```
 
 Node.js 20 or later is required. The repository does not provide a container
-image, process supervisor, reverse-proxy configuration, or deployment workflow.
+image, process supervisor, reverse-proxy configuration, or full-application
+deployment workflow.
 
 ## Environment
 
@@ -63,8 +89,9 @@ playlist write.
 ## Release boundary
 
 CI verifies formatting, public-tree hygiene, linting, types, builds, tests,
-production dependency audit, and mocked Chromium behavior. It does not deploy
-the application.
+production dependency audit, and mocked Chromium behavior. The host Pages
+workflow deploys only the static demo and is not evidence that the live API or
+MusicKit workflow is operational.
 
 Operators must provide revision selection, deployment, monitoring, credential
 checks, and rollback procedures.

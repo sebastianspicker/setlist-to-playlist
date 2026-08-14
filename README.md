@@ -27,7 +27,9 @@ Interfaces and configuration may change during alpha development.
 The demo is a local-only click-through built from sanitized test fixture data
 and the application's visual system. It does not call setlist.fm, connect to
 Apple Music, or create a playlist. Every interactive action is visibly marked
-as simulated.
+as simulated. The user-site GitHub Pages workflow builds a reviewed, immutable
+Showtape revision and publishes only this static demo at `/showtape/`; it does
+not deploy the live application.
 
 ## Current capabilities
 
@@ -54,8 +56,8 @@ as simulated.
   Apple authorization or playlist creation.
 - Ambiguous Apple Music write failures are not retried automatically because
   the external operation may already have succeeded.
-- The repository contains CI checks but no deployment, release, or rollback
-  automation.
+- GitHub Pages deployment covers only the static demo. The live application
+  still has no deployment, release, or rollback automation.
 
 ## Requirements
 
@@ -187,7 +189,15 @@ and [docs/screenshots/README.md](docs/screenshots/README.md).
 
 ## Deployment and operation
 
-The repository supports a self-hosted Node.js process:
+The sanitized static demo is produced by `scripts/build-pages-demo.mjs`. Its
+generated `dist/pages` directory is an ignored deployment artifact, not
+committed source. The established `sebastianspicker.github.io` Pages workflow
+owns deployment: it checks out a reviewed, immutable Showtape revision, builds
+the demo, and stages it at `/showtape/` in the host artifact. Updating this
+repository does not publish the demo until that host-side revision pin is
+reviewed and advanced. See [deployment](docs/tech/deployment.md).
+
+The full application supports a self-hosted Node.js process:
 
 ```bash
 corepack pnpm@9.15.3 install --frozen-lockfile
@@ -198,7 +208,7 @@ corepack pnpm@9.15.3 --filter web start
 Run the process behind TLS, provide the required environment variables, and
 configure the exact browser origin in `ALLOWED_ORIGIN`. The repository does not
 provide a container image, process supervisor, reverse-proxy configuration, or
-deployment workflow.
+full-application deployment workflow.
 
 After deployment, check `GET /api/health`. See
 [docs/tech/deployment.md](docs/tech/deployment.md) for proxy and rate-limit

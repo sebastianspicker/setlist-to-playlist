@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapSetlistFmToSetlist } from '../src/setlist/mapper';
+import { mapSetlistFmToSetlist } from '../src/setlist/setlistfm-mapper';
 import { flattenSetlistToEntries } from '../src/setlist/flatten';
 import { buildPlaylistName } from '../src/setlist/playlist-name';
 import { buildSearchQuery } from '../src/matching/search-query';

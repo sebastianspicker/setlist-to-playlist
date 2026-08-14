@@ -3,14 +3,34 @@ import type { NextRequest } from 'next/server';
 
 const isDev = process.env.NODE_ENV === 'development';
 
+function getApiOrigin(): string | undefined {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+
+  if (!apiUrl || /[;,\s]/.test(apiUrl)) {
+    return undefined;
+  }
+
+  try {
+    const { hostname, origin, protocol } = new URL(apiUrl);
+    const isLocalHttp =
+      process.env.NODE_ENV !== 'production' &&
+      protocol === 'http:' &&
+      (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]');
+    return protocol === 'https:' || isLocalHttp ? origin : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function buildCsp(nonce: string): string {
+  const apiOrigin = getApiOrigin();
   const cspDirectives = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' https://js-cdn.music.apple.com${isDev ? " 'unsafe-eval'" : ''}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
-    "connect-src 'self' https://api.music.apple.com",
+    `connect-src 'self' https://api.music.apple.com${apiOrigin ? ` ${apiOrigin}` : ''}`,
     "frame-src 'none'",
     "object-src 'none'",
     "base-uri 'self'",

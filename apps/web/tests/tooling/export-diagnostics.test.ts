@@ -2,7 +2,7 @@ import { mkdtempSync, realpathSync, symlinkSync, existsSync, rmSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { resolveOutPath } from '../../../../scripts/export-diagnostics';
+import { resolveOutPath } from '../../../../scripts/support-diagnostics';
 
 const tempDirs: string[] = [];
 

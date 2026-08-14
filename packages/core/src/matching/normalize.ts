@@ -1,32 +1,55 @@
-const METADATA_KEYWORDS =
-  '(?:live|acoustic|remaster(?:ed)?|radio\\s+edit|bonus\\s+track|live\\s+version)';
+const METADATA_PREFIXES = [
+  'live',
+  'acoustic',
+  'remaster',
+  'remastered',
+  'radio edit',
+  'bonus track',
+  'live version',
+];
 
-/** Regex to strip parentheticals containing metadata keywords (e.g. "(2019 Remastered)"). */
-const PARENTHETICAL_RE = new RegExp(
-  `\\s*\\(\\s*(?:\\d{4}\\s+)?${METADATA_KEYWORDS}[^)]*\\)\\s*`,
-  'gi'
-);
+const FEAT_WITH_METADATA_RE =
+  /\s*(?:feat|ft)\.?\s+[^(\n]*?\s*-\s*(live|acoustic|remaster(?:ed)?|radio\s+edit|bonus\s+track|live\s+version)\b\s*/gi;
 
-/** Regex to strip unclosed parentheticals with metadata keywords at end of string. */
-const UNCLOSED_PAREN_RE = new RegExp(`\\s*\\(\\s*(?:\\d{4}\\s+)?${METADATA_KEYWORDS}[^)]*$`, 'gi');
+function startsWithMetadata(value: string): boolean {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/^\d{4}\s+/, '');
+  return METADATA_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+}
+
+function stripMetadataParentheticals(value: string): string {
+  const replaceMetadata = (match: string) =>
+    startsWithMetadata(match.slice(1, match.endsWith(')') ? -1 : undefined)) ? ' ' : match;
+
+  return value
+    .replace(/\([^)]{0,500}\)/g, replaceMetadata)
+    .replace(/\([^)]{0,500}$/, replaceMetadata);
+}
+
+function stripFeaturing(value: string): string {
+  const marker = /\s(?:feat|ft)\.?\s+/i.exec(value);
+  if (!marker?.index) return value;
+
+  const start = marker.index;
+  const remaining = value.slice(start + marker[0].length);
+  const boundary = remaining.search(/[(\n]/);
+  return boundary < 0
+    ? value.slice(0, start)
+    : value.slice(0, start) + ' ' + remaining.slice(boundary);
+}
 
 /** Strip metadata (feat., live, remaster, etc.) from a track name for search. */
 export function normalizeTrackName(name: string): string {
   if (!name || typeof name !== 'string') return '';
 
   // 1. Strip parentheticals containing metadata (including optional year prefix, e.g. "(2019 Remastered)")
-  PARENTHETICAL_RE.lastIndex = 0;
-  let s = name.replace(PARENTHETICAL_RE, ' ');
-  UNCLOSED_PAREN_RE.lastIndex = 0;
-  s = s.replace(UNCLOSED_PAREN_RE, ' ');
+  let s = stripMetadataParentheticals(name);
 
   // 2. feat. segment before trailing dash: if "feat. X - <metadata>", keep the metadata; otherwise remove entire feat. segment
-  const featWithMetadata = new RegExp(
-    `\\s*(?:feat|ft)\\.?\\s+[^(\\n]*?\\s*-\\s*(${METADATA_KEYWORDS})\\b\\s*`,
-    'gi'
-  );
-  s = s.replace(featWithMetadata, ' $1 ');
-  s = s.replace(/\s*(?:feat|ft)\.?\s+[^(\n]+(?:\s*-\s*[^(\n]+)?\s*/gi, ' ');
+  s = s.replace(FEAT_WITH_METADATA_RE, ' $1 ');
+  s = stripFeaturing(s);
 
   // 3. Trailing dash metadata after feat. (live, remastered, radio edit, etc.).
   s = s

@@ -3,7 +3,7 @@
 import type { RefObject } from 'react';
 import type { Setlist } from '@repo/core';
 import { Button } from '@repo/ui';
-import { StepHeader } from '@/components/StepHeader';
+import { WorkflowStepHeader } from '@/components/WorkflowStepHeader';
 import { SetlistPreview } from './SetlistPreview';
 
 export interface PreviewStepProps {
@@ -23,7 +23,7 @@ export function PreviewStep({
 
   return (
     <section className="workflow-section" aria-label="Review setlist">
-      <StepHeader
+      <WorkflowStepHeader
         step={2}
         title="Review setlist"
         context="Confirm the show and song order before matching."

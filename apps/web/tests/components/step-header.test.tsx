@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
-import { StepHeader } from '../../src/components/StepHeader';
+import { WorkflowStepHeader as StepHeader } from '../../src/components/WorkflowStepHeader';
 
 afterEach(cleanup);
 

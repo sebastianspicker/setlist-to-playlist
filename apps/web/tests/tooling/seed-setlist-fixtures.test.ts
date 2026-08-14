@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { seedDemoSetlists } from '../../../../scripts/seed-demo-setlists';
+import { seedDemoSetlists } from '../../../../scripts/seed-demo-setlist-fixtures';
 
 const tempDirs: string[] = [];
 

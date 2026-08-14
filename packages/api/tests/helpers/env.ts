@@ -4,7 +4,7 @@
 export function saveEnv(keys: string[]): Record<string, string | undefined> {
   const saved: Record<string, string | undefined> = {};
   for (const key of keys) {
-    saved[key] = process.env[key];
+    Reflect.set(saved, key, Reflect.get(process.env, key));
   }
   return saved;
 }
@@ -14,10 +14,11 @@ export function saveEnv(keys: string[]): Record<string, string | undefined> {
  */
 export function restoreEnv(keys: string[], saved: Record<string, string | undefined>): void {
   for (const key of keys) {
-    if (saved[key] !== undefined) {
-      process.env[key] = saved[key];
+    const value = Reflect.get(saved, key) as string | undefined;
+    if (value !== undefined) {
+      Reflect.set(process.env, key, value);
     } else {
-      delete process.env[key];
+      Reflect.deleteProperty(process.env, key);
     }
   }
 }
