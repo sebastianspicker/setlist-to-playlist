@@ -65,7 +65,9 @@ export function MatchingWorkflow({
         canProceed={canProceed}
         onAutoMatchAll={autoMatchAll}
         onSkipUnmatched={skipUnmatched}
-        onProceed={() => onProceedToCreatePlaylist(matches)}
+        onProceed={() => {
+          onProceedToCreatePlaylist(matches);
+        }}
       />
     </section>
   );

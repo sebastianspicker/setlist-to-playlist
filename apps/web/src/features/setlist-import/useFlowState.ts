@@ -42,7 +42,9 @@ export function useFlowState(): UseFlowStateResult {
         el.focus({ preventScroll: true });
       }
     });
-    return () => cancelAnimationFrame(id);
+    return () => {
+      cancelAnimationFrame(id);
+    };
   }, [step]);
 
   const goToPreview = useCallback(() => {

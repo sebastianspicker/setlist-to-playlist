@@ -35,9 +35,13 @@ export function TrackSearchControls(props: SearchControlsProps) {
           id={inputId}
           type="search"
           value={searchQuery}
-          onChange={(event) => handleQueryChange(event, onSearchQueryChange)}
+          onChange={(event) => {
+            handleQueryChange(event, onSearchQueryChange);
+          }}
           placeholder="Song name, artist…"
-          onKeyDown={(event) => handleSearchKeyDown(event, onSearch)}
+          onKeyDown={(event) => {
+            handleSearchKeyDown(event, onSearch);
+          }}
           autoFocus
           className="input search-input"
           aria-controls={resultsId}

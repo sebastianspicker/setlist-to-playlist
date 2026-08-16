@@ -142,7 +142,9 @@ function RowActions({
       <button
         ref={changeButtonRef}
         type="button"
-        onClick={() => onOpenSearch(index)}
+        onClick={() => {
+          onOpenSearch(index);
+        }}
         aria-label={`Change match for ${trackNameOrFallback(row.setlistEntry.name, 'track')}`}
         className="button button--quiet button--compact"
         disabled={row.status === 'pending'}
@@ -152,7 +154,9 @@ function RowActions({
       {row.status !== 'skipped' && (
         <button
           type="button"
-          onClick={() => onSkip(index)}
+          onClick={() => {
+            onSkip(index);
+          }}
           aria-label={`Skip ${trackNameOrFallback(row.setlistEntry.name, 'track')}`}
           className="button button--quiet button--compact"
           disabled={row.status === 'pending'}
@@ -209,8 +213,14 @@ function CatalogMatchRowComponent(props: CatalogMatchRowProps) {
           onSearch={() => {
             void onSearch(index);
           }}
-          onChoose={(track) => restoreFocus(() => onChoose(index, track))}
-          onCancel={() => restoreFocus(onCancelSearch)}
+          onChoose={(track) => {
+            restoreFocus(() => {
+              onChoose(index, track);
+            });
+          }}
+          onCancel={() => {
+            restoreFocus(onCancelSearch);
+          }}
         />
       )}
     </li>

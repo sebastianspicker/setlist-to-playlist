@@ -32,7 +32,9 @@ export function TrackSearchResults({
           <li key={track.id}>
             <button
               type="button"
-              onClick={() => onChoose(track)}
+              onClick={() => {
+                onChoose(track);
+              }}
               className="search-result-button"
               aria-label={selectionLabel(track)}
             >
