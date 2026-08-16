@@ -55,6 +55,9 @@ Thumbs.db
 !/.codacy/codacy.config.json
 !/.codacy/codacy.yaml
 !/.codacy/codacy.yml
+/.codacy.yaml
+/.codacy/codacy.config.json
+/.codacy/codacy.yaml
 /.codegraph/
 /.impeccable/
 /.serena/
