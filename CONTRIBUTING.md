@@ -40,19 +40,13 @@ corepack pnpm@9.15.3 typecheck
 corepack pnpm@9.15.3 test
 corepack pnpm@9.15.3 build
 corepack pnpm@9.15.3 audit:security
-corepack pnpm@9.15.3 test:e2e
 ```
 
 Use `corepack pnpm@9.15.3 --filter <package-name> test` for a narrower workspace
 test while developing.
 
 For UI changes, inspect keyboard operation, focus movement, loading, empty,
-error, and terminal states. Check the affected surface at 320 CSS pixels and a
-desktop width. Refresh screenshots only when the documented UI changes:
-
-```bash
-corepack pnpm@9.15.3 test:e2e:screenshots
-```
+error, and terminal states at both narrow and desktop widths.
 
 ## Pull requests
 

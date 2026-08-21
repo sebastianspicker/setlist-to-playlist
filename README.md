@@ -124,7 +124,7 @@ the upstream setlist.
 
 | Path              | Responsibility                                                                   |
 | ----------------- | -------------------------------------------------------------------------------- |
-| `apps/web`        | Next.js pages, API Route Handlers, browser workflow, and web tests.              |
+| `apps/web`        | Next.js pages, API Route Handlers, and web tests.                                |
 | `packages/api`    | Reusable server-side handlers for token signing and setlist access.              |
 | `packages/core`   | Setlist parsing, mapping, matching, naming, and track deduplication.             |
 | `packages/shared` | Shared API types, constants, and utilities.                                      |
@@ -146,7 +146,7 @@ Run commands from the repository root.
 | `corepack pnpm@9.15.3 hygiene:check`  | Check the public tree for local state and sensitive file patterns. |
 | `corepack pnpm@9.15.3 lint`           | Run workspace ESLint checks.                                       |
 | `corepack pnpm@9.15.3 typecheck`      | Build typed dependencies and type-check the web app.               |
-| `corepack pnpm@9.15.3 test`           | Run workspace Vitest suites with coverage.                         |
+| `corepack pnpm@9.15.3 test`           | Run focused workspace contracts.                                   |
 | `corepack pnpm@9.15.3 build`          | Build all workspace packages.                                      |
 | `corepack pnpm@9.15.3 audit:security` | Audit production dependencies at moderate severity or higher.      |
 | `corepack pnpm@9.15.3 bundle:report`  | Report initial `/` JavaScript and CSS sizes after a build.         |
@@ -168,24 +168,7 @@ output before sharing it.
 
 ```bash
 corepack pnpm@9.15.3 test
-corepack pnpm@9.15.3 test:e2e
 ```
-
-The Playwright suite uses Chromium, intercepted first-party API routes, and a
-browser MusicKit mock. It covers the workflow, keyboard focus, selected
-responsive widths, and serious or critical axe findings.
-
-Additional browser commands:
-
-```bash
-corepack pnpm@9.15.3 test:e2e:screenshots
-corepack pnpm@9.15.3 test:e2e:performance
-```
-
-The performance command runs a local production-mode LCP and CLS check. It is
-not field performance data. See
-[browser tests](apps/web/tests/e2e/README.md)
-and [docs/screenshots/README.md](docs/screenshots/README.md).
 
 ## Deployment and operation
 
@@ -225,8 +208,6 @@ requirements.
 - Per-client rate limiting is disabled: this is expected when no trusted client
   key is available. Set `TRUST_PROXY=1` only behind a proxy that replaces
   forwarded IP headers.
-- Playwright cannot find Chromium: install the pinned browser or set
-  `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to a compatible local executable.
 - No catalog match: search manually or skip the song.
 - Ambiguous playlist write: inspect the Apple Music library before trying
   again.

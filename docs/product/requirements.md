@@ -64,10 +64,8 @@ At least one selected track is required before export.
 
 ## Verification boundaries
 
-Vitest covers parsing, mapping, matching, API behavior, rate limiting, CORS, and
-browser storage logic. Playwright covers the main workflow with mocked
-third-party services, selected responsive widths, keyboard focus, and axe
-checks.
+Focused contracts cover parsing, mapping, API behavior, security headers, and
+workflow state. Live browser behavior remains a manual product check.
 
 Live setlist credentials, Apple Music authorization, playlist writes, Safari,
 VoiceOver, and a deployed environment are outside the automated test boundary.

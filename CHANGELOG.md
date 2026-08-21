@@ -10,11 +10,6 @@ published.
 
 ### Added
 
-- Deterministic Playwright coverage for the import, preview, matching, manual
-  search, export, partial-recovery, responsive, keyboard, and accessibility
-  states.
-- Workflow screenshots captured from the real `/` route with mocked external
-  responses.
 - Public `/privacy` and `/terms` routes backed by maintained root documents.
 - Showtape product metadata, web manifest icons, and browser mark.
 - Visible setlist.fm source attribution using the validated response URL or the

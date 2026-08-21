@@ -27,9 +27,7 @@ rm -rf \
   packages/shared/coverage \
   packages/ui/coverage \
   coverage \
-  playwright-report \
   test-results \
-  blob-report \
-  .playwright || true
+  blob-report || true
 
 echo "Cleanup complete."

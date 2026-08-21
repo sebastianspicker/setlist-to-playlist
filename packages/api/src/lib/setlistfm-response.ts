@@ -43,20 +43,11 @@ const readSuccessfulResponse = async (
   }
 };
 
-const parseUpstreamMessage = (text: string, statusText: string): string => {
-  try {
-    const parsed = JSON.parse(text) as { message?: unknown };
-    return typeof parsed.message === 'string' ? parsed.message : text || statusText;
-  } catch {
-    return text || statusText;
-  }
-};
-
 const readFailureResponse = async (res: Response): Promise<FetchSetlistFailure> => {
   try {
     const text = await readTextWithinLimit(res, MAX_UPSTREAM_RESPONSE_BYTES);
     if (text === null) return responseTooLarge();
-    return { ok: false, status: res.status, message: parseUpstreamMessage(text, res.statusText) };
+    return { ok: false, status: res.status, message: `setlist.fm returned HTTP ${res.status}.` };
   } catch {
     return invalidUpstreamResponse();
   }

@@ -19,7 +19,7 @@ const forbiddenPaths = [
   /(^|\/)\.env(?!\.example$)/,
   /\.(?:pem|key|p8|p12|pfx|cer|crt|der|mobileprovision|jks|keystore)$/i,
   /(^|\/)(?:credentials|secrets|private)(?:\/|$)/i,
-  /(^|\/)(?:node_modules|coverage|test-results|playwright-report|blob-report)(?:\/|$)/,
+  /(^|\/)(?:node_modules|coverage|test-results|blob-report)(?:\/|$)/,
   /(^|\/)(?:\.next|dist|build|out)(?:\/|$)/,
   /^(?:\.codacy\.yaml|\.mcp\.json)$/,
   /(^|\/)\.repowise(?:\/|$)/,
